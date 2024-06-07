@@ -1,5 +1,5 @@
 MODEL:
-  NUM_CLASSES: 10
+  OUTPUT_DIM: 64
 
 WANDB:
   ENABLE: False
@@ -8,15 +8,15 @@ WANDB:
   ENTITY: "pinlab-sapienza"
 
 DATASETS:
-  TRAIN: "mnist"   # mnist, cifar10, cifar100, imagenette, imagenet
+  TRAIN: "datasets/temp_debug/"   # mnist, cifar10, cifar100, imagenette, imagenet
 
 SOLVER:
- GPUS: [0]
+ GPUS: [3]
  NUM_WORKERS: 8
  BASE_LR: 0.1
  MILESTONE: [10,20]
- BATCH_SIZE: 300
- EPOCHS: 20
+ BATCH_SIZE: 2
+ EPOCHS: 2000
  WEIGHT_DECAY: 0.0005
  MOMENTUM: 0.9
 #  LR_METHOD: "poly"
@@ -24,12 +24,11 @@ SOLVER:
 #  MOMENTUM: 0.9
 #  ETA_MIN: 1e-7
 #  WARMUP_ITERS: 200
- BATCH_SIZE_VAL: 100
+ BATCH_SIZE_VAL: 2
  
 
-
 NAME: "mnist"
-OUTPUT_DIR: "results/3_layer_mnist_norm_init1/mnist/"
+OUTPUT_DIR: "results/debug"
 resume: ""
 SEED: -1
 DEBUG: 0

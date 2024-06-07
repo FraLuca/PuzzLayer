@@ -18,8 +18,8 @@ _C.INPUT.IN_CHANNELS = 1
 _C.INPUT.OUT_CHANNELS = 1
 
 _C.DATASETS = CN()
-_C.DATASETS.TRAIN = "dataset/train_folder"
-_C.DATASETS.TEST = "dataset/test_folder"
+_C.DATASETS.TRAIN = "datasets/train_folder"
+_C.DATASETS.TEST = "datasets/test_folder"
 
 _C.SOLVER = CN()
 _C.SOLVER.GPUS = [0, 1, 2, 3]

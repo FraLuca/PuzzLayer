@@ -183,3 +183,4 @@ pyrightconfig.json
 .vscode/
 results/
 datasets/
+lightning_logs/

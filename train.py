@@ -55,10 +55,10 @@ def main():
     # create a checkpoint callback
     checkpoint_callback = ModelCheckpoint(
         dirpath=cfg.SAVE_DIR,
-        filename='_{val_acc:.3f}',
+        filename='_{val_loss:.3f}',
         save_top_k=1,
-        monitor='val_acc',
-        mode='max',
+        monitor='val_loss',
+        mode='min',
     )
 
     callbacks = [checkpoint_callback]
@@ -72,7 +72,7 @@ def main():
         log_every_n_steps=50,
         # accumulate_grad_batches=1,
         sync_batchnorm=True,
-        strategy="ddp_find_unused_parameters_false", # ddp_find_unused_parameters_true
+        strategy="ddp_find_unused_parameters_true", # ddp_find_unused_parameters_true
         # plugins=DDPPlugin(find_unused_parameters=True),
         num_nodes=1,
         logger=logger,
