@@ -13,3 +13,5 @@ scikit_learn
 # einops
 setproctitle
 wandb
+transformers
+torch_geometric
