@@ -19,18 +19,50 @@ def build_dataset(cfg, train=True):
 
 class ModelDataset(torch.utils.data.Dataset):
     def __init__(self, cfg, train=True):
-        self.path = cfg.DATASETS.TRAIN
+        if train:
+            self.path = cfg.DATASETS.TRAIN
+        else:
+            self.path = cfg.DATASETS.TEST
         self.file_list = os.listdir(self.path)
-        self.max_num_ckpt = torch.load(self.path + self.file_list[0])['pdata'].shape[0]
+        # self.max_num_ckpt = torch.load(self.path + self.file_list[0])['pdata'].shape[0]
+        self.max_num_ckpt = 2
 
         # model = torch.load("mnist/NND_mnist_run1.pt", map_location='cpu')['model'].module  # TODO, we need to save module when we create data
-        self.model = nn.Sequential(
-            nn.Linear(1*28*28, 50),
-            nn.ReLU(),
-            nn.Linear(50, 25),
-            nn.ReLU(),
-            nn.Linear(25, 10)
-        )
+        self.model = {
+            "MLP3" : nn.Sequential(
+                        nn.Linear(1*28*28, 50),
+                        nn.ReLU(),
+                        nn.Linear(50, 25),
+                        nn.ReLU(),
+                        nn.Linear(25, 10)
+                    ),
+            "MLP2" : nn.Sequential(
+                        nn.Linear(784, 64),
+                        nn.ReLU(),
+                        nn.Linear(64, 10)
+                    ),
+            "MLP4" : nn.Sequential(
+                        nn.Linear(784, 50),
+                        nn.ReLU(),
+                        nn.Linear(50, 25),
+                        nn.ReLU(),
+                        nn.Linear(25, 25),
+                        nn.ReLU(),
+                        nn.Linear(25, 10)
+                    ),
+        }
+    
+        self.couples_to_class = {
+            "0 1": 0,
+            "1 4": 1,
+            "2 4": 2,
+            "2 7": 3,
+            "4 6": 4,
+            "4 9": 5,
+            "5 7": 6,
+            "8 9": 7,
+            "3 6": 8,
+        }
 
     def __len__(self):
         return len(os.listdir(self.path))
@@ -39,9 +71,17 @@ class ModelDataset(torch.utils.data.Dataset):
 
         f = self.file_list[idx]
         rnd_ckpt_idx = torch.randint(0, self.max_num_ckpt, (1,)).item()
-        data = torch.load(self.path + f)['pdata'][rnd_ckpt_idx]        
+        modeltype = f[:4]
 
-        data = partial_reverse_tomodel(data, self.model)
+        if "MLP" in modeltype:
+            data = torch.load(self.path + f)['pdata'][rnd_ckpt_idx]        
+            data = partial_reverse_tomodel(data, self.model[modeltype])
+        else:
+            data = torch.load(self.path + f, map_location="cpu")['pdata'][rnd_ckpt_idx]
+        
+        for param in data.parameters():
+            param.requires_grad = False
+
         arch = sequential_to_arch(data)
         x, edge_index, edge_attr = arch_to_graph(arch)
         g_data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
@@ -50,16 +90,19 @@ class ModelDataset(torch.utils.data.Dataset):
         text = text[1:-1] # remove from text "[", "]"
         text = text.replace(",", " ") # substitute "," with " "
 
-        return g_data, text
+        text = self.couples_to_class[text]
+
+        return g_data, text, f
 
 
 def custom_collate_fn(batch):
     data_list = [d[0] for d in batch]
     text_list = [d[1] for d in batch]
+    f_list = [d[2] for d in batch]
 
     # for data in data_list:
     #     for key, value in data:
     #         if torch.is_tensor(value):
     #             value.requires_grad_(False)
 
-    return Batch.from_data_list(data_list), text_list
+    return Batch.from_data_list(data_list), torch.tensor(text_list), f_list

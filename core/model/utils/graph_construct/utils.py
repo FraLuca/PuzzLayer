@@ -30,7 +30,6 @@ def make_edge_attr(weights, l, edge_type, conv_size=None, triplanar_size=None):
     edge_attr[:, 1] is layer number
     edge_attr[:, 2] is edge type (see constants.EDGE_TYPES)
     edge_attr[:, (3,4,5)] are position in convolution kernel (if conv_size is not None)
-    edge_attr[:, (3,4)] are position in TODO
     '''
     edge_attr = torch.zeros(weights.shape[0], 6)
     edge_attr[:, 0] = weights[:, 0]
@@ -178,7 +177,7 @@ def linear_to_graph(weight, bias, l, in_neuron_idx, out_neuron=False, curr_idx=0
     edge_index = []
     
     input_neurons = weight.shape[1]
-    assert input_neurons == in_neuron_idx.shape[0]
+    assert input_neurons == in_neuron_idx.shape[0] # it means: input dim of linear must match out dim (out channels for conv)of previous layer
     
     feat = make_node_feat(input_neurons, l, NODE_TYPES[label + 'neuron'], end_neuron=(l==0))
     input_x = feat
