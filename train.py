@@ -16,6 +16,7 @@ import shutil
 
 import warnings
 warnings.filterwarnings('ignore')
+os.environ["NCCL_P2P_DISABLE"] = "1"
 
 
 

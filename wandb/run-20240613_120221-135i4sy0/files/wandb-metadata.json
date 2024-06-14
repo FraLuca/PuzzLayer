@@ -1,0 +1,27 @@
+{
+    "os": "Linux-6.5.0-1019-oem-x86_64-with-glibc2.10",
+    "python": "3.8.17",
+    "heartbeatAt": "2024-06-13T10:02:22.524681",
+    "startedAt": "2024-06-13T10:02:21.086962",
+    "docker": null,
+    "gpu": "NVIDIA GeForce RTX 3090",
+    "gpu_count": 3,
+    "cpu_count": 16,
+    "cuda": null,
+    "args": [
+        "-cfg",
+        "configs/train.yaml"
+    ],
+    "state": "running",
+    "program": "train.py",
+    "codePath": "train.py",
+    "git": {
+        "remote": "https://github.com/FraLuca/PuzzLayer.git",
+        "commit": "c4de8e61a8d363deab0679dfa10a9249dce71419"
+    },
+    "email": "alessiosampieri27@gmail.com",
+    "root": "/home/AlessioSan/Projects/PuzzLayerPalma",
+    "host": "visnu",
+    "username": "AlessioSan",
+    "executable": "/home/AlessioSan/miniconda3/envs/pdiff/bin/python"
+}

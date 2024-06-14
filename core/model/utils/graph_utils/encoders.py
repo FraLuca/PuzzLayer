@@ -52,10 +52,7 @@ class NodeEdgeFeatEncoder(nn.Module):
             x = self.x_norm(x)
         x = self.x_proj(x)
         
-        e0 = self.weight_encoder(edge_attr[:, 0].unsqueeze(-1))
-
-        return x, e0
-    
+        e0 = self.weight_encoder(edge_attr[:, 0].unsqueeze(-1))    
         e1 = self.edge_layer_encoder(edge_attr[:, 1].unsqueeze(-1))
         e2 = self.edge_type_encoder(edge_attr[:, 2].long())
         if self.use_conv:

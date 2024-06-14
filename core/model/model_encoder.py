@@ -10,12 +10,12 @@ class ModelEncoder(torch.nn.Module):
         super(ModelEncoder, self).__init__()
 
         self.encoder = NodeEdgeFeatEncoder(64)
-        mpnn = EdgeMPNN(64, 64, 76, 64, 64, 3)
+        mpnn = EdgeMPNN(64, 64, 76, 64, 64, 3, dropout=0.2)
         pooling = MLPEdgeReadout(64, 64, cfg.MODEL.OUTPUT_DIM)
         self.gnn = GNNwEdgeReadout(mpnn, pooling)
 
     def forward(self, batch, f=None):
-        encoded_x, encoded_edge = self.encoder(batch.x, batch.edge_attr[:,:1])
+        encoded_x, encoded_edge = self.encoder(batch.x, batch.edge_attr)
         graph_encoding = self.gnn(encoded_x, batch.edge_index, encoded_edge, batch.batch)
         # if graph_encoding.shape[0] > 1: # if not sanity check
         #     # compute all pairwise differences between the rows of graph_encoding

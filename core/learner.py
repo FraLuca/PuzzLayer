@@ -12,6 +12,7 @@ from core.configs import cfg
 
 from torch_geometric.data import Batch
 from transformers import BertTokenizer, get_linear_schedule_with_warmup
+from sklearn.metrics import accuracy_score
 
 
 class Learner(pl.LightningModule):
@@ -27,7 +28,8 @@ class Learner(pl.LightningModule):
         # self.criterion = CLIPLoss()
         self.criterion = nn.CrossEntropyLoss()
 
-        self.classifier = nn.Linear(cfg.MODEL.OUTPUT_DIM, 9)
+        self.classifier = nn.Sequential(nn.ReLU(), nn.Linear(cfg.MODEL.OUTPUT_DIM, cfg.MODEL.OUTPUT_DIM//2),
+                                        nn.ReLU(), nn.Linear(cfg.MODEL.OUTPUT_DIM//2, cfg.MODEL.NUM_CLASSES))
 
         self.save_hyperparameters(cfg)
         # self.automatic_optimization = False
@@ -54,8 +56,15 @@ class Learner(pl.LightningModule):
         class_logits = self.classifier(model_embed)
         
         # loss = self.criterion(model_embed, text_embed)
-        loss = self.criterion(class_logits, text_batch)
-        acc = (class_logits.argmax(dim=1) == text_batch).float().mean()
+        loss = self.criterion(class_logits, text_batch.float())
+        # acc = (class_logits.argmax(dim=1) == text_batch).float().mean()
+
+        # compute accuracy for multi label classification (2 classes)
+        acc = torch.topk(class_logits, 2).indices
+        # covert acc to one hot
+        acc = torch.zeros_like(class_logits).scatter(1, acc, 1)
+        acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
+        
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
@@ -76,8 +85,14 @@ class Learner(pl.LightningModule):
         class_logits = self.classifier(model_embed)
         
         # loss = self.criterion(model_embed, text_embed)
-        loss = self.criterion(class_logits, text_batch)
-        acc = (class_logits.argmax(dim=1) == text_batch).float().mean()
+        loss = self.criterion(class_logits, text_batch.float())
+
+        # acc = (class_logits.argmax(dim=1) == text_batch).float().mean()
+        acc = torch.topk(class_logits, 2).indices
+        # covert acc to one hot
+        acc = torch.zeros_like(class_logits).scatter(1, acc, 1)
+        acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
+
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
@@ -119,9 +134,10 @@ class Learner(pl.LightningModule):
         # optimizer = torch.optim.SGD(self.model.parameters(), lr=cfg.SOLVER.BASE_LR, weight_decay=cfg.SOLVER.WEIGHT_DECAY, momentum=cfg.SOLVER.MOMENTUM)
         # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=cfg.SOLVER.MILESTONE, gamma=0.2)
 
-        optimizer1 = torch.optim.AdamW(self.model_encoder.parameters(), lr=cfg.SOLVER.BASE_LR1, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
+        list_parameters = list(self.model_encoder.parameters()) + list(self.classifier.parameters())
+        optimizer1 = torch.optim.AdamW(list_parameters, lr=cfg.SOLVER.BASE_LR1, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
         # optimizer2 = torch.optim.AdamW(self.classifier.parameters(), lr=cfg.SOLVER.BASE_LR2, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
-        scheduler1 = get_linear_schedule_with_warmup(optimizer1, num_warmup_steps=cfg.SOLVER.WARMUP_ITERS, num_training_steps=-1)
+        # scheduler1 = get_linear_schedule_with_warmup(optimizer1, num_warmup_steps=cfg.SOLVER.WARMUP_ITERS, num_training_steps=-1)
         # scheduler2 = get_linear_schedule_with_warmup(optimizer2, num_warmup_steps=cfg.SOLVER.WARMUP_ITERS, num_training_steps=-1)
 
-        return [optimizer1], [scheduler1]
+        return [optimizer1], []
