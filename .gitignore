@@ -186,3 +186,4 @@ datasets/
 lightning_logs/
 param_text_align/not_more_useful/
 param_text_align/wandb/
+wandb/
