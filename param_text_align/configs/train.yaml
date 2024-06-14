@@ -1,0 +1,41 @@
+MODEL:
+  LAYER_LIST: "['conv_1_128_5', 'batchnorm2D_128', 'relu', 'conv_128_256_3', 'avgpool', 'linear_256_10']" # linear_1024_256,batchnorm1D_256,relu,linear_256_64,batchnorm1D_64,relu,linear_64_10
+  INIT_FACTOR: 1.
+  INITIALIZATION: "xavier" #"normal_custom"
+  SAVE_START: 20 #30
+  TYPE: "MLP3"
+
+WANDB:
+  ENABLE: False
+  GROUP: "MNIST"
+  PROJECT: "param_text_align"
+  ENTITY: "pinlab-sapienza"
+
+DATASETS:
+  TRAIN: "mnist"   # mnist, cifar10, cifar100, imagenette, imagenet
+  CLASS_IDS: "[0,1]"
+
+SOLVER:
+ GPUS: [2] #[4,5,6,7]
+ NUM_WORKERS: 8
+ BASE_LR: 0.001
+ MILESTONE: [10,20]
+ BATCH_SIZE: 300
+ EPOCHS: 40 #130
+ WEIGHT_DECAY: 0.0005
+ MOMENTUM: 0.9
+#  LR_METHOD: "poly"
+#  LR_POWER: 0.5
+#  MOMENTUM: 0.9
+#  ETA_MIN: 1e-7
+#  WARMUP_ITERS: 200
+ BATCH_SIZE_VAL: 100
+ 
+
+
+NAME: "mnist"
+OUTPUT_DIR: "results/convs_train_newseeds2/train/"
+TEMP_DIR: "results/convs_train_newseeds2/temp/"
+resume: ""
+SEED: -1
+DEBUG: 0

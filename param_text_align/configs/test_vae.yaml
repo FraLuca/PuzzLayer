@@ -1,0 +1,30 @@
+WANDB:
+  ENABLE: False
+  GROUP: "MNIST"
+  PROJECT: "param_text_align"
+  ENTITY: "pinlab-sapienza"
+
+DATASETS:
+  TRAIN: "mnist"
+
+SOLVER:
+ GPUS: [0]
+ NUM_WORKERS: 8
+ BASE_LR: 1e-4
+ BATCH_SIZE: 1
+ EPOCHS: 1000
+#  LR_METHOD: "poly"
+#  LR_POWER: 0.5
+#  MOMENTUM: 0.9
+ WEIGHT_DECAY: 0.0005
+ ETA_MIN: 1e-7
+#  WARMUP_ITERS: 200
+ BATCH_SIZE_VAL: 1
+
+
+NAME: "debug"
+OUTPUT_DIR: "results/"
+resume_model: "results/all_linear_pretrained/mnist/linear_1024_64_relu_linear_64_10/_val_acc=0.923.ckpt"
+resume_vae: "results/vae_mnist/linear_3072_100_relu_linear_100_10/_val_loss=0.000348.ckpt"
+SEED: -1
+DEBUG: 0
