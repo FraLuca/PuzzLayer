@@ -16,7 +16,7 @@ import shutil
 
 import warnings
 warnings.filterwarnings('ignore')
-# os.environ["NCCL_P2P_DISABLE"] = "1"
+os.environ["NCCL_P2P_DISABLE"] = "1"
 
 
 
@@ -56,10 +56,10 @@ def main():
     # create a checkpoint callback
     checkpoint_callback = ModelCheckpoint(
         dirpath=cfg.SAVE_DIR,
-        filename='_{val_loss:.3f}',
+        filename='_{val_acc:.3f}',
         save_top_k=1,
-        monitor='val_loss',
-        mode='min',
+        monitor='val_acc',
+        mode='max',
     )
 
     callbacks = [checkpoint_callback]
