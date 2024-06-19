@@ -185,3 +185,4 @@ results/
 datasets/
 lightning_logs/
 wandb/
+Dockerfile

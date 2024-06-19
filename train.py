@@ -16,9 +16,22 @@ import shutil
 
 import warnings
 warnings.filterwarnings('ignore')
-os.environ["NCCL_P2P_DISABLE"] = "1"
+# os.environ["NCCL_P2P_DISABLE"] = "1"
 
+class PeriodicCheckpoint(ModelCheckpoint):
+    def __init__(self, dirpath: str, every: int):
+        super().__init__()
+        self.dirpath = dirpath
+        self.every = every
 
+    def on_train_epoch_end(
+        self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs
+    ):
+        if (pl_module.current_epoch + 1) % self.every == 0:
+            assert self.dirpath is not None
+            self.filename = f"model_{pl_module.current_epoch}.ckpt"
+            filepath = self.dirpath + "/" + self.filename
+            trainer.save_checkpoint(filepath)
 
 def main():
 
@@ -61,8 +74,9 @@ def main():
         monitor='val_acc',
         mode='max',
     )
+    periodic_checkpoint = PeriodicCheckpoint(cfg.SAVE_DIR, cfg.SAVE_CHECK_EVERY)
 
-    callbacks = [checkpoint_callback]
+    callbacks = [checkpoint_callback, periodic_checkpoint]
 
     # create a trainer
     trainer = pl.Trainer(

@@ -140,6 +140,6 @@ class Learner(pl.LightningModule):
         # optimizer2 = torch.optim.AdamW(self.classifier.parameters(), lr=cfg.SOLVER.BASE_LR2, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
         # scheduler1 = get_linear_schedule_with_warmup(optimizer1, num_warmup_steps=cfg.SOLVER.WARMUP_ITERS, num_training_steps=-1)
         # scheduler2 = get_linear_schedule_with_warmup(optimizer2, num_warmup_steps=cfg.SOLVER.WARMUP_ITERS, num_training_steps=-1)
-        # linear_sched = LinearLR(optimizer1, start_factor=0.01, total_iters=warmup_iters) # occhio e' in iters non in epochs
+        # linear_sched = LinearLR(optimizer1, start_factor=0.01, total_iters=9600)
 
         return [optimizer1], []
