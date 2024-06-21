@@ -9,12 +9,9 @@ class ModelEncoder(torch.nn.Module):
     def __init__(self, input_dim=1, output_dim=1):
         super(ModelEncoder, self).__init__()
 
-        # self.encoder = NodeEdgeFeatEncoder(64)
-        self.encoder = NodeEdgeFeatEncoder(128)
-        # mpnn = EdgeMPNN(64, 64, 76, 64, 64, 3, dropout=0.2)
-        mpnn = EdgeMPNN(128, 128, 96, 128, 128, 3, dropout=0.2)
-        # pooling = MLPEdgeReadout(64, 64, cfg.MODEL.OUTPUT_DIM)
-        pooling = MLPEdgeReadout(128, 128, cfg.MODEL.OUTPUT_DIM)
+        self.encoder = NodeEdgeFeatEncoder(64)
+        mpnn = EdgeMPNN(64, 64, 76, 64, 64, 3, dropout=0.2)
+        pooling = MLPEdgeReadout(64, 64, cfg.MODEL.OUTPUT_DIM)
         self.gnn = GNNwEdgeReadout(mpnn, pooling)
 
     def forward(self, batch, f=None):

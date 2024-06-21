@@ -9,17 +9,17 @@ WANDB:
   ENTITY: "pinlab-sapienza"
 
 DATASETS:
-  TRAIN: "datasets/trainSMALLER/"   # mnist, cifar10, cifar100, imagenette, imagenet
-  TEST: "datasets/valid/"
+  TRAIN: "datasets/trainNEWSMALLER/"   # mnist, cifar10, cifar100, imagenette, imagenet
+  TEST: "datasets/validNEW/"
 
 SOLVER:
- GPUS: [0,1]
- NUM_WORKERS: 8
- BASE_LR1: 0.00025 #0.001
+ GPUS: [2,3]
+ NUM_WORKERS: 3
+ BASE_LR1: 0.0005 #0.001
  BASE_LR2: 0. #0.0001
  MILESTONE: [10,20]
- BATCH_SIZE: 32
- EPOCHS: 20000
+ BATCH_SIZE: 64
+ EPOCHS: 30000
  WEIGHT_DECAY: 0. #0.0005
  MOMENTUM: 0.9
 #  LR_METHOD: "poly"
@@ -30,7 +30,7 @@ SOLVER:
  BATCH_SIZE_VAL: 1
  
 
-NAME: "widerCapacity1LayClassifLR25e-5"
+NAME: "dgx_lr5e-4_nowd_30kepochs"
 OUTPUT_DIR: "results/debug"
 SAVE_CHECK_EVERY: 200
 resume: ""
