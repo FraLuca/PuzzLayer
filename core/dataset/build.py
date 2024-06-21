@@ -51,54 +51,6 @@ class ModelDataset(torch.utils.data.Dataset):
                         nn.Linear(25, 10)
                     ),
         }
-    
-        self.couples_to_class = {
-            "0 1": 0,
-            "0 2": 1,
-            "0 3": 2,
-            "0 4": 3,
-            "0 5": 4,
-            "0 6": 5,
-            "0 7": 6,
-            "0 8": 7,
-            "0 9": 8,
-            "1 2": 9,
-            "1 3": 10,
-            "1 4": 11,
-            "1 5": 12,
-            "1 6": 13,
-            "1 7": 14,
-            "1 8": 15,
-            "1 9": 16,
-            "2 3": 17,
-            "2 4": 18,
-            "2 5": 19,
-            "2 6": 20,
-            "2 7": 21,
-            "2 8": 22,
-            "2 9": 23,
-            "3 4": 24,
-            "3 5": 25,
-            "3 6": 26,
-            "3 7": 27,
-            "3 8": 28,
-            "3 9": 29,
-            "4 5": 30,
-            "4 6": 31,
-            "4 7": 32,
-            "4 8": 33,
-            "4 9": 34,
-            "5 6": 35,
-            "5 7": 36,
-            "5 8": 37,
-            "5 9": 38,
-            "6 7": 39,
-            "6 8": 40,
-            "6 9": 41,
-            "7 8": 42,
-            "7 9": 43,
-            "8 9": 44
-        }
 
         self.couples_to_onehot = {
             "0 1": [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -160,7 +112,7 @@ class ModelDataset(torch.utils.data.Dataset):
         if "MLP" in modeltype:
             data = torch.load(self.path + f)['pdata'][rnd_ckpt_idx]        
             data = partial_reverse_tomodel(data, self.model[modeltype])
-        else:
+        elif "CNN" in modeltype:
             data = torch.load(self.path + f, map_location="cpu")['pdata'][rnd_ckpt_idx]
         
         for param in data.parameters():
@@ -174,7 +126,7 @@ class ModelDataset(torch.utils.data.Dataset):
         text = text[1:-1] # remove from text "[", "]"
         text = text.replace(",", " ") # substitute "," with " "
 
-        text = self.couples_to_onehot[text]
+        # text = self.couples_to_onehot[text]
 
         return g_data, text, f
 
@@ -189,4 +141,4 @@ def custom_collate_fn(batch):
     #         if torch.is_tensor(value):
     #             value.requires_grad_(False)
 
-    return Batch.from_data_list(data_list), torch.tensor(text_list), f_list
+    return Batch.from_data_list(data_list), text_list, f_list
