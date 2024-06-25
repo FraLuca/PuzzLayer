@@ -21,8 +21,8 @@ class CLIPLoss(nn.Module):
         labels = torch.arange(batch_size, device=image_features.device)
 
         # Calcola la perdita
-        loss_img_to_txt = F.cross_entropy(logits_per_image, labels)
-        loss_txt_to_img = F.cross_entropy(logits_per_text, labels)
+        loss_img_to_txt = F.cross_entropy(logits_per_image, labels, reduction='mean')
+        loss_txt_to_img = F.cross_entropy(logits_per_text, labels, reduction='mean')
         
         # La perdita totale è la media delle due direzioni
         loss = (loss_img_to_txt + loss_txt_to_img) / 2

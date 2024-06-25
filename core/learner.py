@@ -24,7 +24,7 @@ class Learner(pl.LightningModule):
 
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         vocab_size = self.tokenizer.vocab_size
-        self.text_encoder = TextEncoder(vocab_size)
+        self.text_encoder = TextEncoder(vocab_size, embed_dim=64, num_heads=1, num_layers=2, dropout=0.2)
 
         self.criterion = CLIPLoss()
         # self.criterion = nn.CrossEntropyLoss()
@@ -57,7 +57,7 @@ class Learner(pl.LightningModule):
         model_batch, text_batch, f = batch
 
         # model_batch = Batch.from_data_list(model_batch)
-        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)
+        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:3]
 
         model_embed, text_embed = self(model_batch, text_batch, f)
         # model_embed = self(model_batch, text_batch, f)
@@ -73,7 +73,10 @@ class Learner(pl.LightningModule):
         # acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
         
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        # self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        # select only indices of the list f that contain "CNN2"
+        cnn2_indices = [i for i in range(len(f)) if "CNN2" in f[i]]
+        acc = self.compute_accuracy_alignment(model_embed[cnn2_indices], text_embed[cnn2_indices])
+        self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         # self.manual_backward(loss)
         # opt1.step()
@@ -85,7 +88,7 @@ class Learner(pl.LightningModule):
         model_batch, text_batch, f = batch
 
         # model_batch = Batch.from_data_list(model_batch)
-        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)
+        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:3]
 
         model_embed, text_embed = self(model_batch, text_batch, f)
         # model_embed = self(model_batch, text_batch, f)
@@ -100,10 +103,22 @@ class Learner(pl.LightningModule):
         # acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        # self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        # select only indices of the list f that contain "CNN2"
+        cnn2_indices = [i for i in range(len(f)) if "CNN2" in f[i]]
+        acc = self.compute_accuracy_alignment(model_embed[cnn2_indices], text_embed[cnn2_indices])
+        self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return loss
 
+    def compute_accuracy_alignment(self, model_features, text_features):
+        model_features = F.normalize(model_features, dim=1)
+        text_features = F.normalize(text_features, dim=1)
+
+        # compute cosine similarity
+        sim = text_features @ model_features.t()
+        acc = (torch.argmax(sim, dim=1) == torch.arange(sim.shape[0], device=sim.device)).float().mean()
+
+        return acc
 
     def train_dataloader(self):
         train_set = build_dataset(self.cfg, train=True)
