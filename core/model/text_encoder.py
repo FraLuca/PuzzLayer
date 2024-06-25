@@ -18,6 +18,7 @@ class TextEncoder(torch.nn.Module):
                 torch.nn.TransformerEncoderLayer(
                     d_model=embed_dim,
                     nhead=num_heads,
+                    batch_first=True,
                 )
             )
 

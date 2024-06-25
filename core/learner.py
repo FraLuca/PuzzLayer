@@ -32,10 +32,17 @@ class Learner(pl.LightningModule):
         self.classifier = nn.Sequential(nn.ReLU(), nn.Linear(cfg.MODEL.OUTPUT_DIM, cfg.MODEL.OUTPUT_DIM//2),
                                         nn.ReLU(), nn.Linear(cfg.MODEL.OUTPUT_DIM//2, cfg.MODEL.NUM_CLASSES))
 
+        if cfg.PRETRAINED_MODEL_ENCODER:
+            self.load_checkpoint(cfg.PRETRAINED_MODEL_ENCODER)
+        
         self.save_hyperparameters(cfg)
         # self.automatic_optimization = False
 
 
+    def load_checkpoint(self, checkpoint_path):
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        model_encoder_weights = {k: v for k, v in checkpoint["state_dict"].items() if "model_encoder" in k}
+        self.load_state_dict(model_encoder_weights, strict=False)
 
     def forward(self, model_batch, text_batch, f=None):
         model_embed = self.model_encoder(model_batch, f)
