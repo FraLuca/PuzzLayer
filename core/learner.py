@@ -27,16 +27,12 @@ class Learner(pl.LightningModule):
         self.text_encoder = TextEncoder(vocab_size, embed_dim=64, num_heads=1, num_layers=2, dropout=0.2)
 
         self.criterion = CLIPLoss()
-        # self.criterion = nn.CrossEntropyLoss()
-
-        # self.classifier = nn.Sequential(nn.ReLU(), nn.Linear(cfg.MODEL.OUTPUT_DIM, cfg.MODEL.OUTPUT_DIM//2),
-        #                                 nn.ReLU(), nn.Linear(cfg.MODEL.OUTPUT_DIM//2, cfg.MODEL.NUM_CLASSES))
 
         if cfg.PRETRAINED_MODEL_ENCODER:
             self.load_checkpoint(cfg.PRETRAINED_MODEL_ENCODER)
 
         self.save_hyperparameters(cfg)
-        # self.automatic_optimization = False
+
 
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
@@ -50,62 +46,33 @@ class Learner(pl.LightningModule):
         return model_embed, text_embed
 
     def training_step(self, batch, batch_idx):
-        # opt1 = self.optimizers()
-        # opt1.zero_grad()
-        # scheduler1 = self.lr_schedulers()
-
         model_batch, text_batch, f = batch
 
-        # model_batch = Batch.from_data_list(model_batch)
-        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:3]
+        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 2:-1]
 
         model_embed, text_embed = self(model_batch, text_batch, f)
-        # model_embed = self(model_batch, text_batch, f)
-        # class_logits = self.classifier(model_embed)
         
         loss = self.criterion(model_embed, text_embed)
-        # loss = self.criterion(class_logits, text_batch.float())
-
-        # compute accuracy for multi label classification (2 classes)
-        # acc = torch.topk(class_logits, 2).indices
-        # covert acc to one hot
-        # acc = torch.zeros_like(class_logits).scatter(1, acc, 1)
-        # acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
         
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        # select only indices of the list f that contain "CNN2"
-        cnn2_indices = [i for i in range(len(f)) if "CNN2" in f[i]]
-        acc = self.compute_accuracy_alignment(model_embed[cnn2_indices], text_embed[cnn2_indices])
+
+        acc = self.compute_accuracy_alignment(model_embed, text_embed)
         self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        # self.manual_backward(loss)
-        # opt1.step()
-        # scheduler1.step()
-        
         return loss
 
     def validation_step(self, batch, batch_idx):
         model_batch, text_batch, f = batch
 
-        # model_batch = Batch.from_data_list(model_batch)
-        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:3]
+        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 2:-1]
 
         model_embed, text_embed = self(model_batch, text_batch, f)
-        # model_embed = self(model_batch, text_batch, f)
-        # class_logits = self.classifier(model_embed)
         
         loss = self.criterion(model_embed, text_embed)
-        # loss = self.criterion(class_logits, text_batch.float())
-
-        # acc = torch.topk(class_logits, 2).indices
-        # covert acc to one hot
-        # acc = torch.zeros_like(class_logits).scatter(1, acc, 1)
-        # acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        # select only indices of the list f that contain "CNN2"
-        cnn2_indices = [i for i in range(len(f)) if "CNN2" in f[i]]
-        acc = self.compute_accuracy_alignment(model_embed[cnn2_indices], text_embed[cnn2_indices])
+
+        acc = self.compute_accuracy_alignment(model_embed, text_embed)
         self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return loss
@@ -155,7 +122,7 @@ class Learner(pl.LightningModule):
         # optimizer = torch.optim.SGD(self.model.parameters(), lr=cfg.SOLVER.BASE_LR, weight_decay=cfg.SOLVER.WEIGHT_DECAY, momentum=cfg.SOLVER.MOMENTUM)
         # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=cfg.SOLVER.MILESTONE, gamma=0.2)
 
-        list_parameters = list(self.model_encoder.parameters()) + list(self.text_encoder.parameters()) #+ list(self.classifier.parameters())
+        list_parameters = list(self.model_encoder.parameters()) + list(self.text_encoder.parameters())
         optimizer1 = torch.optim.AdamW(list_parameters, lr=cfg.SOLVER.BASE_LR1, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
         # optimizer2 = torch.optim.AdamW(self.classifier.parameters(), lr=cfg.SOLVER.BASE_LR2, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
         # scheduler1 = get_linear_schedule_with_warmup(optimizer1, num_warmup_steps=cfg.SOLVER.WARMUP_ITERS, num_training_steps=-1)

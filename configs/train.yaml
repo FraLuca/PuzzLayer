@@ -13,12 +13,12 @@ DATASETS:
   TEST: "datasets/validNEW/"
 
 SOLVER:
- GPUS: [0]
+ GPUS: [2,3,4,5]
  NUM_WORKERS: 4
- BASE_LR1: 0.0005
+ BASE_LR1: 0.00001
  BASE_LR2: 0. #0.0001
  MILESTONE: [10,20]
- BATCH_SIZE: 64
+ BATCH_SIZE: 100
  EPOCHS: 30000
  WEIGHT_DECAY: 0. #0.0005
  MOMENTUM: 0.9
@@ -30,9 +30,9 @@ SOLVER:
  BATCH_SIZE_VAL: 30
  
 
-NAME: "pretrained_lr5e-4_nowd_64batch_1gpu"
+NAME: "4gbatch_nopre" # "dgx_pretrained_moretext_lr5e-4_nowd_64batch_1gpu"
 OUTPUT_DIR: "results/debug"
-PRETRAINED_MODEL_ENCODER: "results/debug/dgx_lr5e-4_nowd/_val_acc=0.877.ckpt" # None
+PRETRAINED_MODEL_ENCODER: None # "results/debug/dgx_lr5e-4_nowd_30kepochs/_val_acc=0.877.ckpt"
 SAVE_CHECK_EVERY: 200
 resume: ""
 SEED: -1
