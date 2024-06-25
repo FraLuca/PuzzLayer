@@ -85,16 +85,16 @@ def main():
         max_epochs=cfg.SOLVER.EPOCHS,
         max_steps=-1,
         log_every_n_steps=50,
-        # accumulate_grad_batches=1,
+        accumulate_grad_batches=8,
         sync_batchnorm=True,
         strategy="ddp_find_unused_parameters_true", # ddp_find_unused_parameters_true
         # plugins=DDPPlugin(find_unused_parameters=True),
         num_nodes=1,
         logger=logger,
         callbacks=callbacks,
-        check_val_every_n_epoch=10,
+        check_val_every_n_epoch=1,
         # val_check_interval=500,
-        precision=32,
+        precision=16,
         # detect_anomaly=True,
     )
 

@@ -4,6 +4,7 @@ import torch.nn as nn
 from torchvision import transforms
 from torchvision.datasets import MNIST #, CIFAR10, CIFAR100, ImageFolder, ImageNet
 from torch_geometric.data import Data, Batch
+import re
 
 from core.model.utils.graph_construct.model_arch_graph import sequential_to_arch, arch_to_graph, partial_reverse_tomodel # , graph_to_arch, arch_to_sequential
 
@@ -102,6 +103,12 @@ class ModelDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(os.listdir(self.path))
+    
+    def replace_conv2d_definitions(self, file_content):
+        pattern = r'Conv2d\((\d+),\s*(\d+),\s*kernel_size=\((\d+),\s*(\d+)\),\s*stride=\((\d+),\s*(\d+)\)\)'
+        replacement = r'Conv2d(in_channels=\1, out_channels=\2, kernel_size=(\3, \4), stride=(\5, \6))'
+        modified_content = re.sub(pattern, replacement, file_content)
+        return modified_content
 
     def __getitem__(self, idx):
 
@@ -122,9 +129,26 @@ class ModelDataset(torch.utils.data.Dataset):
         x, edge_index, edge_attr = arch_to_graph(arch)
         g_data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
 
-        text = f.split('_')[2]
-        text = text[1:-1] # remove from text "[", "]"
-        text = text.replace(",", " ") # substitute "," with " "
+        classes = f.split('_')[2]
+        classes = classes[1:-1] # remove from text "[", "]"
+        classes = classes.replace(",", " ") # substitute "," with " "
+
+        dataset_text = f.split('_')[1]
+
+        sequential_text = ''
+        for i, layer in enumerate(data):
+            text_repr = layer.__repr__()
+            if 'Conv2d' in text_repr:
+                text_repr = self.replace_conv2d_definitions(text_repr)
+            sequential_text += text_repr
+            if i != len(data) - 1:
+                sequential_text += ' -> '
+            else:
+                sequential_text += ' [SEP] '
+
+        
+        # put the text in the format "sequential_text [SEP] dataset classes"
+        text = sequential_text + dataset_text + ' ' + classes
 
         # text = self.couples_to_onehot[text]
 

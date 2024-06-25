@@ -42,6 +42,17 @@ class Learner(pl.LightningModule):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         model_encoder_weights = {k: v for k, v in checkpoint["state_dict"].items() if "model_encoder" in k}
         self.load_state_dict(model_encoder_weights, strict=False)
+    
+    def tokenize_text_batch(self, text_batch, max_length=200):
+        return self.tokenizer(
+            text_batch,
+            padding='max_length',   # Aggiungere padding se la sequenza è più corta della lunghezza fissa
+            truncation=True,        # Troncare la sequenza se è più lunga della lunghezza fissa
+            max_length=max_length,  # Lunghezza fissa desiderata
+            return_tensors='pt'     # Restituire tensori PyTorch
+        )
+    
+
 
 
     def forward(self, model_batch, text_batch, f=None):
@@ -57,7 +68,9 @@ class Learner(pl.LightningModule):
         model_batch, text_batch, f = batch
 
         # model_batch = Batch.from_data_list(model_batch)
-        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:3]
+        #text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)#[:, 1:3]
+        text_batch = self.tokenize_text_batch(text_batch).to(model_batch.x.device)
+        
 
         model_embed, text_embed = self(model_batch, text_batch, f)
         # model_embed = self(model_batch, text_batch, f)
@@ -88,7 +101,8 @@ class Learner(pl.LightningModule):
         model_batch, text_batch, f = batch
 
         # model_batch = Batch.from_data_list(model_batch)
-        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:3]
+        #text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)#[:, 1:3]
+        text_batch = self.tokenize_text_batch(text_batch).to(model_batch.x.device)
 
         model_embed, text_embed = self(model_batch, text_batch, f)
         # model_embed = self(model_batch, text_batch, f)

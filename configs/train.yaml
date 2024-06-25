@@ -3,7 +3,7 @@ MODEL:
   NUM_CLASSES: 10
 
 WANDB:
-  ENABLE: True
+  ENABLE: False
   GROUP: "alignment"
   PROJECT: "PuzzLayer"
   ENTITY: "pinlab-sapienza"
@@ -13,12 +13,12 @@ DATASETS:
   TEST: "datasets/validNEW/"
 
 SOLVER:
- GPUS: [0]
+ GPUS: [2]
  NUM_WORKERS: 4
- BASE_LR1: 0.0005
+ BASE_LR1: 0.001
  BASE_LR2: 0. #0.0001
  MILESTONE: [10,20]
- BATCH_SIZE: 64
+ BATCH_SIZE: 100
  EPOCHS: 30000
  WEIGHT_DECAY: 0. #0.0005
  MOMENTUM: 0.9
