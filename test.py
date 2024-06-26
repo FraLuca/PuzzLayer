@@ -1,71 +1,69 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
+import os
+import random
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import WandbLogger
+# from pytorch_lightning.plugins import DDPPlugin
+
+import setproctitle
+from core.learner import Learner
+from core.utils.misc import mkdir, parse_args
+from core.configs import cfg
+
+import glob
+import torch
+import shutil
+
+import warnings
+warnings.filterwarnings('ignore')
+# os.environ["NCCL_P2P_DISABLE"] = "1"
+
+def main():
+
+    args = parse_args()
+    print(args, end="\n\n")
+
+    output_dir = cfg.SAVE_DIR
+    if output_dir:
+        mkdir(output_dir)
+
+    
+    setproctitle.setproctitle(cfg.NAME)
+    
+    seed = cfg.SEED
+    if seed == -1:
+        seed = random.randint(0, 100000)
+    pl.seed_everything(seed, workers=True)
 
 
-class Learner(pl.LightningModule):
-    def __init__(self, cfg):
-        super().__init__()
-        self.cfg = cfg
-        self.model = build_model(cfg)
-        self.model = init_model(cfg, self.model)
-        print(self.model)
+    # create a learner that create a model, a dataloader and a loss function
+    learner = Learner(cfg)
 
-        self.criterion = nn.CrossEntropyLoss()
-        self.save_hyperparameters(cfg)
+    # create a trainer
+    trainer = pl.Trainer(
+        accelerator="gpu",
+        devices=cfg.SOLVER.GPU_TEST,
+        max_epochs=cfg.SOLVER.EPOCHS,
+        max_steps=-1,
+        log_every_n_steps=50,
+        # accumulate_grad_batches=4,
+        sync_batchnorm=True,
+        # strategy="ddp_find_unused_parameters_true", # ddp_find_unused_parameters_true
+        # plugins=DDPPlugin(find_unused_parameters=True),
+        num_nodes=1,
+        logger=None,
+        check_val_every_n_epoch=1,
+        # val_check_interval=500,
+        precision=32,
+        # detect_anomaly=True,
+    )
 
-    def forward(self, x):
-        return self.model(x)
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self(x)
-        loss = self.criterion(y_hat, y)
-        accuracy = (y_hat.argmax(1) == y).float().mean()
-        self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('train_acc', accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-                
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self(x)
-        loss = self.criterion(y_hat, y)
-        accuracy = (y_hat.argmax(1) == y).float().mean()
-        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('val_acc', accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        return loss
-
-    def train_dataloader(self):
-        train_set = build_dataset(self.cfg, train=True)
-
-        train_loader = DataLoader(
-            dataset=train_set,
-            batch_size=self.cfg.SOLVER.BATCH_SIZE,
-            shuffle=True,
-            num_workers=self.cfg.SOLVER.NUM_WORKERS,
-            pin_memory=True,
-            drop_last=True,
-            persistent_workers=True,)
-        return train_loader
-
-    def val_dataloader(self):
-        val_set = build_dataset(self.cfg, train=False)
-        
-        val_loader = DataLoader(
-            dataset=val_set,
-            batch_size=self.cfg.SOLVER.BATCH_SIZE_VAL,
-            shuffle=False,
-            num_workers=self.cfg.SOLVER.NUM_WORKERS,
-            pin_memory=True,
-            persistent_workers=True,)
-        return val_loader
+    # train the model
+    trainer.test(learner, ckpt_path=cfg.MODEL_TO_TEST)
+    
+    print("Training Over")
 
 
-    def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=cfg.SOLVER.BASE_LR, weight_decay=cfg.SOLVER.WEIGHT_DECAY, momentum=cfg.SOLVER.MOMENTUM)
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=cfg.SOLVER.MILESTONE, gamma=0.2)
 
-        return [optimizer], [scheduler]
+if __name__ == '__main__':
+    main()

@@ -79,7 +79,7 @@ class ModelDataset(torch.utils.data.Dataset):
         text = text[1:-1] # remove from text "[", "]"
         text = text.replace(",", " ") # substitute "," with " "
 
-        # text = f.split('_')[0] + ' ' + text
+        text = f.split('_')[0][-1] + ' ' + text
 
         return g_data, text, f
 

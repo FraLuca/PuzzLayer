@@ -85,7 +85,7 @@ def main():
         max_epochs=cfg.SOLVER.EPOCHS,
         max_steps=-1,
         log_every_n_steps=50,
-        # accumulate_grad_batches=8,
+        accumulate_grad_batches=4,
         sync_batchnorm=True,
         strategy="ddp_find_unused_parameters_true", # ddp_find_unused_parameters_true
         # plugins=DDPPlugin(find_unused_parameters=True),

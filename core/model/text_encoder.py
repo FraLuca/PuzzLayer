@@ -6,7 +6,7 @@ class TextEncoder(torch.nn.Module):
         super(TextEncoder, self).__init__()
         self.embed_scale = embed_dim ** 0.5
         self.embed_tokens = torch.nn.Embedding(vocab_size, embed_dim)
-        self.pos_embed = torch.nn.Parameter(torch.randn((1, 2, embed_dim)))
+        self.pos_embed = torch.nn.Parameter(torch.randn((1, 3, embed_dim)))
         self.seg_embed = torch.nn.Parameter(torch.randn((2, embed_dim)))
         self.dropout = torch.nn.Dropout(dropout)
 

@@ -32,14 +32,18 @@ class Learner(pl.LightningModule):
         if cfg.PRETRAINED_MODEL_ENCODER:
             print(f"Loading pretrained model encoder from {cfg.PRETRAINED_MODEL_ENCODER}")
             self.load_checkpoint(cfg.PRETRAINED_MODEL_ENCODER)
+        
+            # freeze text encoder params
+            for param in self.text_encoder.parameters():
+                param.requires_grad = False
 
         self.save_hyperparameters(cfg)
 
 
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        # model_encoder_weights = {k: v for k, v in checkpoint["state_dict"].items() if "model_encoder" in k}
-        self.load_state_dict(checkpoint["state_dict"], strict=True)
+        text_encoder_weights = {k: v for k, v in checkpoint["state_dict"].items() if "text_encoder" in k}
+        self.load_state_dict(text_encoder_weights, strict=False)
 
 
     def forward(self, model_batch, text_batch, f=None):
@@ -64,6 +68,22 @@ class Learner(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        model_batch, text_batch, f = batch
+
+        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:-1]
+
+        model_embed, text_embed = self(model_batch, text_batch, f)
+        
+        loss = self.criterion(model_embed, text_embed)
+
+        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+
+        acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
+        self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+
+        return loss
+    
+    def test_step(self, batch, batch_idx):
         model_batch, text_batch, f = batch
 
         text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:-1]
@@ -118,6 +138,20 @@ class Learner(pl.LightningModule):
             collate_fn=custom_collate_fn,
             )
         return val_loader
+    
+    def test_dataloader(self):
+        test_set = build_dataset(self.cfg, train=False)
+        
+        test_loader = DataLoader(
+            dataset=test_set,
+            batch_size=self.cfg.SOLVER.BATCH_SIZE_VAL,
+            shuffle=False,
+            num_workers=self.cfg.SOLVER.NUM_WORKERS,
+            pin_memory=True,
+            persistent_workers=True,
+            collate_fn=custom_collate_fn,
+            )
+        return test_loader
 
 
     def configure_optimizers(self):
