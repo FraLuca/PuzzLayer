@@ -76,7 +76,7 @@ def main():
     )
     periodic_checkpoint = PeriodicCheckpoint(cfg.SAVE_DIR, cfg.SAVE_CHECK_EVERY)
 
-    callbacks = [checkpoint_callback, periodic_checkpoint]
+    callbacks = [checkpoint_callback]
 
     # create a trainer
     trainer = pl.Trainer(

@@ -126,19 +126,21 @@ class ModelDataset(torch.utils.data.Dataset):
         text = text[1:-1] # remove from text "[", "]"
         text = text.replace(",", " ") # substitute "," with " "
 
-        text = self.couples_to_onehot[text]
+        # text = self.couples_to_onehot[text]
+        one_hot = self.couples_to_onehot[text]
 
-        return g_data, text, f
+        return g_data, text, one_hot, f
 
 
 def custom_collate_fn(batch):
     data_list = [d[0] for d in batch]
     text_list = [d[1] for d in batch]
-    f_list = [d[2] for d in batch]
+    one_hot_batch = torch.tensor([d[2] for d in batch])
+    f_list = [d[3] for d in batch]
 
     # for data in data_list:
     #     for key, value in data:
     #         if torch.is_tensor(value):
     #             value.requires_grad_(False)
 
-    return Batch.from_data_list(data_list), torch.tensor(text_list), f_list
+    return Batch.from_data_list(data_list), text_list, one_hot_batch, f_list

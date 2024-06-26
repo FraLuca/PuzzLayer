@@ -45,33 +45,34 @@ class Learner(pl.LightningModule):
         self.load_state_dict(model_encoder_weights, strict=False)
 
     def forward(self, model_batch, text_batch, f=None):
-        model_embed = self.model_encoder(model_batch, f)
-        # text_embed = self.text_encoder(text_batch)
-        return model_embed #, text_embed
+        # model_embed = self.model_encoder(model_batch, f)
+        text_embed = self.text_encoder(text_batch)
+        return text_embed
+        # return model_embed #, text_embed
 
     def training_step(self, batch, batch_idx):
         # opt1 = self.optimizers()
         # opt1.zero_grad()
         # scheduler1 = self.lr_schedulers()
 
-        model_batch, text_batch, f = batch
+        model_batch, text_batch, one_hot_batch, f = batch
 
         ## model_batch = Batch.from_data_list(model_batch)
-        # text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)
+        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:-1]
 
         # model_embed, text_embed = self(model_batch, text_batch, f)
         model_embed = self(model_batch, text_batch, f)
         class_logits = self.classifier(model_embed)
         
         # loss = self.criterion(model_embed, text_embed)
-        loss = self.criterion(class_logits, text_batch.float())
+        loss = self.criterion(class_logits, one_hot_batch.float())
         # acc = (class_logits.argmax(dim=1) == text_batch).float().mean()
 
         # compute accuracy for multi label classification (2 classes)
         acc = torch.topk(class_logits, 2).indices
         # covert acc to one hot
         acc = torch.zeros_like(class_logits).scatter(1, acc, 1)
-        acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
+        acc = accuracy_score(one_hot_batch.cpu().numpy(), acc.cpu().numpy())
         
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
@@ -83,23 +84,23 @@ class Learner(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        model_batch, text_batch, f = batch
+        model_batch, text_batch, one_hot_batch, f = batch
 
         ## model_batch = Batch.from_data_list(model_batch)
-        # text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)
+        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:-1]
 
         # model_embed, text_embed = self(model_batch, text_batch, f)
         model_embed = self(model_batch, text_batch, f)
         class_logits = self.classifier(model_embed)
         
         # loss = self.criterion(model_embed, text_embed)
-        loss = self.criterion(class_logits, text_batch.float())
+        loss = self.criterion(class_logits, one_hot_batch.float())
 
         # acc = (class_logits.argmax(dim=1) == text_batch).float().mean()
         acc = torch.topk(class_logits, 2).indices
         # covert acc to one hot
         acc = torch.zeros_like(class_logits).scatter(1, acc, 1)
-        acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
+        acc = accuracy_score(one_hot_batch.cpu().numpy(), acc.cpu().numpy())
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
