@@ -56,6 +56,7 @@ def main():
         # val_check_interval=500,
         precision=32,
         # detect_anomaly=True,
+        # deterministic=True
     )
 
     # train the model

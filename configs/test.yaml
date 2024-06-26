@@ -34,7 +34,7 @@ SOLVER:
 NAME: "nothingpre_2gpu" # "dgx_pretrained_moretext_lr5e-4_nowd_64batch_1gpu"
 OUTPUT_DIR: "results/debug"
 PRETRAINED_MODEL_ENCODER: None #"results/debug/text_lr5e-4_nowd/_val_acc=1.000.ckpt"
-MODEL_TO_TEST: "results/debug/textpre_frozen_4gpu/_val_acc=0.722.ckpt"
+MODEL_TO_TEST: "results/debug/nothingpre_2gpu/_val_acc=0.403.ckpt"
 SAVE_CHECK_EVERY: 200
 resume: ""
 SEED: -1

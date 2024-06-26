@@ -187,3 +187,4 @@ lightning_logs/
 wandb/
 Dockerfile
 *.png
+*.ckpt

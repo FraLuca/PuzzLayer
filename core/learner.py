@@ -15,6 +15,7 @@ from transformers import BertTokenizer, get_linear_schedule_with_warmup
 from torch.optim.lr_scheduler import LinearLR
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
+from core.model.utils.metrics import *
 
 
 class Learner(pl.LightningModule):
@@ -34,16 +35,16 @@ class Learner(pl.LightningModule):
             self.load_checkpoint(cfg.PRETRAINED_MODEL_ENCODER)
         
             # freeze text encoder params
-            for param in self.text_encoder.parameters():
-                param.requires_grad = False
+            # for param in self.text_encoder.parameters():
+            #     param.requires_grad = False
 
         self.save_hyperparameters(cfg)
 
 
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        text_encoder_weights = {k: v for k, v in checkpoint["state_dict"].items() if "text_encoder" in k}
-        self.load_state_dict(text_encoder_weights, strict=False)
+        pre_weights = {k: v for k, v in checkpoint["state_dict"].items() if "model_encoder" in k}
+        self.load_state_dict(pre_weights, strict=False)
 
 
     def forward(self, model_batch, text_batch, f=None):
@@ -78,8 +79,14 @@ class Learner(pl.LightningModule):
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
-        self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        sim = self.compute_sim_matrix(model_embed, text_embed, f)
+        # acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
+        # self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+
+        for k in [1, 3]:
+            recall_i2t, recall_t2i = recall_at_k(sim, k)
+            self.log(f"val_recall_i2t@{k}", recall_i2t, on_step=False, on_epoch=True, sync_dist=True)
+            self.log(f"val_recall_t2i@{k}", recall_t2i, on_step=False, on_epoch=True, sync_dist=True)
 
         return loss
     
@@ -94,10 +101,25 @@ class Learner(pl.LightningModule):
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
-        self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        sim = self.compute_sim_matrix(model_embed, text_embed, f)
+        # acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
+        # self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+
+        for k in [1, 3]:
+            recall_i2t, recall_t2i = recall_at_k(sim, k)
+            self.log(f"val_recall_i2t@{k}", recall_i2t, on_step=False, on_epoch=True, sync_dist=True)
+            self.log(f"val_recall_t2i@{k}", recall_t2i, on_step=False, on_epoch=True, sync_dist=True)
 
         return loss
+
+    def compute_sim_matrix(self, model_features, text_features, f=None):
+        model_features = F.normalize(model_features, dim=1)
+        text_features = F.normalize(text_features, dim=1)
+
+        # compute cosine similarity
+        sim = model_features @ text_features.t()
+
+        return sim
 
     def compute_accuracy_alignment(self, model_features, text_features, f=None):
         model_features = F.normalize(model_features, dim=1)
