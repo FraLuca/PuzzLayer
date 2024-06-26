@@ -14,6 +14,7 @@ from torch_geometric.data import Batch
 from transformers import BertTokenizer, get_linear_schedule_with_warmup
 from torch.optim.lr_scheduler import LinearLR
 from sklearn.metrics import accuracy_score
+import matplotlib.pyplot as plt
 
 
 class Learner(pl.LightningModule):
@@ -24,11 +25,12 @@ class Learner(pl.LightningModule):
 
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         vocab_size = self.tokenizer.vocab_size
-        self.text_encoder = TextEncoder(vocab_size, embed_dim=64, num_heads=1, num_layers=2, dropout=0.2)
+        self.text_encoder = TextEncoder(vocab_size, embed_dim=64, num_heads=2, num_layers=2, dropout=0.1)
 
         self.criterion = CLIPLoss()
 
         if cfg.PRETRAINED_MODEL_ENCODER:
+            print(f"Loading pretrained model encoder from {cfg.PRETRAINED_MODEL_ENCODER}")
             self.load_checkpoint(cfg.PRETRAINED_MODEL_ENCODER)
 
         self.save_hyperparameters(cfg)
@@ -36,8 +38,8 @@ class Learner(pl.LightningModule):
 
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        model_encoder_weights = {k: v for k, v in checkpoint["state_dict"].items() if "model_encoder" in k}
-        self.load_state_dict(model_encoder_weights, strict=False)
+        # model_encoder_weights = {k: v for k, v in checkpoint["state_dict"].items() if "model_encoder" in k}
+        self.load_state_dict(checkpoint["state_dict"], strict=True)
 
 
     def forward(self, model_batch, text_batch, f=None):
@@ -48,7 +50,7 @@ class Learner(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         model_batch, text_batch, f = batch
 
-        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 2:-1]
+        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:-1]
 
         model_embed, text_embed = self(model_batch, text_batch, f)
         
@@ -64,7 +66,7 @@ class Learner(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         model_batch, text_batch, f = batch
 
-        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 2:-1]
+        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:-1]
 
         model_embed, text_embed = self(model_batch, text_batch, f)
         
@@ -72,12 +74,12 @@ class Learner(pl.LightningModule):
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        acc = self.compute_accuracy_alignment(model_embed, text_embed)
+        acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
         self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return loss
 
-    def compute_accuracy_alignment(self, model_features, text_features):
+    def compute_accuracy_alignment(self, model_features, text_features, f=None):
         model_features = F.normalize(model_features, dim=1)
         text_features = F.normalize(text_features, dim=1)
 
@@ -125,7 +127,7 @@ class Learner(pl.LightningModule):
         list_parameters = list(self.model_encoder.parameters()) + list(self.text_encoder.parameters())
         optimizer1 = torch.optim.AdamW(list_parameters, lr=cfg.SOLVER.BASE_LR1, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
         # optimizer2 = torch.optim.AdamW(self.classifier.parameters(), lr=cfg.SOLVER.BASE_LR2, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
-        # scheduler1 = get_linear_schedule_with_warmup(optimizer1, num_warmup_steps=cfg.SOLVER.WARMUP_ITERS, num_training_steps=-1)
+        # scheduler1 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer1, T_max=20*500, eta_min=1e-6)
         # scheduler2 = get_linear_schedule_with_warmup(optimizer2, num_warmup_steps=cfg.SOLVER.WARMUP_ITERS, num_training_steps=-1)
         # linear_sched = LinearLR(optimizer1, start_factor=0.05, total_iters=9600)
 

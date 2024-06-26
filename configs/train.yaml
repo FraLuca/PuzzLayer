@@ -3,7 +3,7 @@ MODEL:
   NUM_CLASSES: 10
 
 WANDB:
-  ENABLE: True
+  ENABLE: False
   GROUP: "alignment"
   PROJECT: "PuzzLayer"
   ENTITY: "pinlab-sapienza"
@@ -13,12 +13,12 @@ DATASETS:
   TEST: "datasets/validNEW/"
 
 SOLVER:
- GPUS: [2,3,4,5]
+ GPUS: [4,5,6,7]
  NUM_WORKERS: 4
- BASE_LR1: 0.00001
+ BASE_LR1: 0.0005
  BASE_LR2: 0. #0.0001
  MILESTONE: [10,20]
- BATCH_SIZE: 100
+ BATCH_SIZE: 64
  EPOCHS: 30000
  WEIGHT_DECAY: 0. #0.0005
  MOMENTUM: 0.9
@@ -30,9 +30,9 @@ SOLVER:
  BATCH_SIZE_VAL: 30
  
 
-NAME: "4gbatch_nopre" # "dgx_pretrained_moretext_lr5e-4_nowd_64batch_1gpu"
+NAME: "4gpu_save" # "dgx_pretrained_moretext_lr5e-4_nowd_64batch_1gpu"
 OUTPUT_DIR: "results/debug"
-PRETRAINED_MODEL_ENCODER: None # "results/debug/dgx_lr5e-4_nowd_30kepochs/_val_acc=0.877.ckpt"
+PRETRAINED_MODEL_ENCODER: None #"results/debug/4gpu_save/_val_acc=0.435.ckpt"
 SAVE_CHECK_EVERY: 200
 resume: ""
 SEED: -1

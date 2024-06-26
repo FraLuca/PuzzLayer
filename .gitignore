@@ -186,3 +186,4 @@ datasets/
 lightning_logs/
 wandb/
 Dockerfile
+*.png
