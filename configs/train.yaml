@@ -16,7 +16,7 @@ DATASETS:
   TEST: "datasets/validNEW/"
 
 SOLVER:
- GPUS: [5]
+ GPUS: [3]
  NUM_WORKERS: 4
  MODEL_ENCODER_LR: 0.0005
  TEXT_ENCODER_LR: 0.0005
@@ -27,9 +27,9 @@ SOLVER:
  BATCH_SIZE_VAL: 30
  
 
-NAME: "modelpre_1sample_1gpu_textalsolay_betterckpt"
+NAME: "modelpre_1sample_1gpu_textalsolay"
 OUTPUT_DIR: "results/debug"
-PRETRAINED_MODEL_ENCODER: "results/debug/dgx_lr5e-4_nowd_30kepochs/_val_acc=0.877.ckpt"
+PRETRAINED_MODEL_ENCODER: "results/debug/dgx lr 5e-4 no wd/_val_acc=0.830.ckpt"
 SAVE_CHECK_EVERY: 200
 resume: ""
 SEED: -1
