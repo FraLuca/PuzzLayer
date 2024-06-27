@@ -12,11 +12,11 @@ WANDB:
   ENTITY: "pinlab-sapienza"
 
 DATASETS:
-  TRAIN: "datasets/trainNEWSMALLER/"   # mnist, cifar10, cifar100, imagenette, imagenet
+  TRAIN: "datasets/trainNEWSMALLER1pertypecouple/"   # mnist, cifar10, cifar100, imagenette, imagenet
   TEST: "datasets/validNEW/"
 
 SOLVER:
- GPUS: [5,6]
+ GPUS: [5]
  NUM_WORKERS: 4
  MODEL_ENCODER_LR: 0.0005
  TEXT_ENCODER_LR: 0.0005
@@ -27,9 +27,9 @@ SOLVER:
  BATCH_SIZE_VAL: 30
  
 
-NAME: "modelpre_fullsubset_2gpu_textalsolay"
+NAME: "modelpre_1sample_1gpu_textalsolay_betterckpt"
 OUTPUT_DIR: "results/debug"
-PRETRAINED_MODEL_ENCODER: "results/debug/dgx lr 5e-4 no wd/_val_acc=0.830.ckpt"
+PRETRAINED_MODEL_ENCODER: "results/debug/dgx_lr5e-4_nowd_30kepochs/_val_acc=0.877.ckpt"
 SAVE_CHECK_EVERY: 200
 resume: ""
 SEED: -1

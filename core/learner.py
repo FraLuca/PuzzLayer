@@ -49,7 +49,6 @@ class Learner(pl.LightningModule):
             print(f"Loading pretrained model encoder from {cfg.PRETRAINED_MODEL_ENCODER}")
             self.load_checkpoint(cfg.PRETRAINED_MODEL_ENCODER)
 
-
         self.save_hyperparameters(cfg)
 
 

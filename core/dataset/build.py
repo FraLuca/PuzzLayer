@@ -25,7 +25,7 @@ class ModelDataset(torch.utils.data.Dataset):
             self.path = cfg.DATASETS.TEST
         self.file_list = os.listdir(self.path)
         # self.max_num_ckpt = torch.load(self.path + self.file_list[0])['pdata'].shape[0]
-        self.max_num_ckpt = 2
+        self.max_num_ckpt = 1
 
         # model = torch.load("mnist/NND_mnist_run1.pt", map_location='cpu')['model'].module
         self.model = {

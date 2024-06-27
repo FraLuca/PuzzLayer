@@ -18,17 +18,19 @@ class ModelEncoder(torch.nn.Module):
                         num_layers=3,
                         dropout=dropout)
         pooling = MLPEdgeReadout(in_dim=64, hidden_dim=64, out_dim=output_dim)
-        self.gnn = GNNwEdgeReadout(mpnn, pooling)
+        # pooling = DSNodeEdgeReadout(in_dim=64, hidden_dim=64, out_dim=output_dim)
+        self.gnn = GNNwEdgeReadout(mpnn, pooling, use_nodes=False)
 
     def forward(self, batch, f=None):
         encoded_x, encoded_edge = self.encoder(batch.x, batch.edge_attr)
         graph_encoding = self.gnn(encoded_x, batch.edge_index, encoded_edge, batch.batch)
-        # if graph_encoding.shape[0] > 1: # if not sanity check
-        #     # compute all pairwise differences between the rows of graph_encoding
-        #     differences = torch.tensor([]).to(graph_encoding.device)
-        #     for i in range(graph_encoding.shape[0]):
-        #         for j in range(i+1, graph_encoding.shape[0]):
-        #             diff = (graph_encoding[i] - graph_encoding[j]).abs().unsqueeze(0)
-        #             differences = torch.cat((differences, diff), dim=0)
-        #     print(differences.mean(dim=0))
+
+        # compute all pairwise differences between the rows of graph_encoding
+        # differences = torch.tensor([]).to(graph_encoding.device)
+        # for i in range(graph_encoding.shape[0]):
+        #     for j in range(i+1, graph_encoding.shape[0]):
+        #         diff = (graph_encoding[i] - graph_encoding[j]).abs().unsqueeze(0)
+        #         differences = torch.cat((differences, diff), dim=0)
+        # print(differences.mean(dim=0))
+        # print(graph_encoding.std(dim=0)) # print std of graph_encodings
         return graph_encoding

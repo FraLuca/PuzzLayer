@@ -1,5 +1,5 @@
 MODEL:
-  TEXT_INPUT_DIM: 128
+  TEXT_INPUT_DIM: 64
   MODEL_INPUT_DIM: 64
   MODEL_OUTPUT_DIM: 64
   PROJ_OUTPUT_DIM: 64
@@ -17,7 +17,7 @@ DATASETS:
 
 SOLVER:
 #  GPUS: [2,3]
- GPU_TEST: [1]
+ GPU_TEST: [2]
  NUM_WORKERS: 4
 #  BASE_LR1: 0.0001
 #  BASE_LR2: 0. #0.0001
@@ -30,7 +30,7 @@ SOLVER:
 NAME: "nothingpre_2gpu" # "dgx_pretrained_moretext_lr5e-4_nowd_64batch_1gpu"
 OUTPUT_DIR: "results/debug"
 PRETRAINED_MODEL_ENCODER: None #"results/debug/text_lr5e-4_nowd/_val_acc=1.000.ckpt"
-MODEL_TO_TEST: "results/debug/nopre_refactored_4gpu/_val_recall_t2i@1=0.223.ckpt"
+MODEL_TO_TEST: "results/debug/modelpre_fullsubset_2gpu_textalsolay/_val_recall_t2i@1=0.864.ckpt"
 SAVE_CHECK_EVERY: 200
 resume: ""
 SEED: -1

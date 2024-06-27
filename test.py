@@ -49,7 +49,7 @@ def main():
         logger=None,
         check_val_every_n_epoch=1,
         # val_check_interval=500,
-        precision=32,
+        precision=16,
         # detect_anomaly=True,
         # deterministic=True
     )
