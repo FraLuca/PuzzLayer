@@ -28,8 +28,6 @@ class TextEncoder(torch.nn.Module):
                 )
             )
 
-            #self.layers.append(torch.nn.LayerNorm(embed_dim))
-
     def forward(self, x):
         #sentence_embeddings = self.create_sentence_attention_mask(x['input_ids'])
         #sentence_embeddings = self.embed_sentence(sentence_embeddings)
@@ -43,7 +41,7 @@ class TextEncoder(torch.nn.Module):
 
         return x.mean(dim=1)
         # return x[:,0]
-
+    
     def create_sentence_attention_mask(self, input_ids):
         attention_mask = torch.zeros_like(input_ids)
         for i, input_id in enumerate(input_ids):

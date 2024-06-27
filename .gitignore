@@ -186,3 +186,5 @@ datasets/
 lightning_logs/
 wandb/
 Dockerfile
+mydatasets/
+*.ckpt

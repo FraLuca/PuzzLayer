@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from sentence_transformers import SentenceTransformer
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from core.model.build import build_model, init_model
@@ -11,9 +12,10 @@ from core.model.utils.loss import CLIPLoss
 from core.configs import cfg
 
 from torch_geometric.data import Batch
-from transformers import BertTokenizer, get_linear_schedule_with_warmup
+from transformers import BertTokenizer, get_linear_schedule_with_warmup, BertModel
 from torch.optim.lr_scheduler import LinearLR
 from sklearn.metrics import accuracy_score
+
 
 
 class Learner(pl.LightningModule):
@@ -22,6 +24,10 @@ class Learner(pl.LightningModule):
         self.cfg = cfg
         output_dim = cfg.MODEL.OUTPUT_DIM_HEAD if cfg.MODEL.MAKE_MODEL_ENCODER_HEAD else cfg.MODEL.OUTPUT_DIM
         self.model_encoder = ModelEncoder()
+        # put requres_grad to False
+        #for param in self.model_encoder.parameters():
+        #    param.requires_grad = False
+
         if self.cfg.MODEL.MAKE_MODEL_ENCODER_HEAD:
             self.model_encoder_head = nn.Sequential(nn.ReLU(), 
                                                     nn.Linear(cfg.MODEL.OUTPUT_DIM, cfg.MODEL.OUTPUT_DIM_HEAD),
@@ -30,14 +36,21 @@ class Learner(pl.LightningModule):
                                                     nn.Linear(cfg.MODEL.OUTPUT_DIM_HEAD, cfg.MODEL.OUTPUT_DIM_HEAD)
                                                     )
 
-        self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        vocab_size = self.tokenizer.vocab_size
-        self.text_encoder = TextEncoder(vocab_size, embed_dim=cfg.MODEL.OUTPUT_DIM, num_heads=1, num_layers=2, dropout=0.2)
+        #self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        #self.bert_model = BertModel.from_pretrained("bert-base-uncased")
+        self.sentences_encoder = SentenceTransformer('bert-base-uncased')
+        # put in eval mode
+        #self.sentences_encoder.eval()
+
+
+        #vocab_size = self.tokenizer.vocab_size
+        #self.text_encoder = TextEncoder(vocab_size, embed_dim=cfg.MODEL.OUTPUT_DIM, num_heads=1, num_layers=2, dropout=0.2)
         if self.cfg.MODEL.MAKE_TEXT_HEAD:
-            self.text_encoder_head = nn.Sequential(nn.ReLU(), 
-                                                    nn.Linear(cfg.MODEL.OUTPUT_DIM, cfg.MODEL.OUTPUT_DIM_HEAD),
+            self.text_encoder_head = nn.Sequential(
+                                                    nn.Linear(768, cfg.MODEL.OUTPUT_DIM_HEAD),
                                                     nn.BatchNorm1d(cfg.MODEL.OUTPUT_DIM_HEAD),
                                                     nn.ReLU(),
+                                                    nn.Dropout(0.2),
                                                     nn.Linear(cfg.MODEL.OUTPUT_DIM_HEAD, cfg.MODEL.OUTPUT_DIM_HEAD)
                                                     )
         
@@ -73,7 +86,9 @@ class Learner(pl.LightningModule):
 
     def forward(self, model_batch, text_batch, f=None):
         model_embed = self.model_encoder(model_batch, f)
-        text_embed = self.text_encoder(text_batch)
+        model_embed = self.model_encoder_head(model_embed)
+        #text_embed = self.text_encoder(text_batch)
+        text_embed = self.text_encoder_head(text_batch)
         return model_embed, text_embed
 
     def training_step(self, batch, batch_idx):
@@ -85,7 +100,14 @@ class Learner(pl.LightningModule):
 
         # model_batch = Batch.from_data_list(model_batch)
         #text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)#[:, 1:3]
-        text_batch = self.tokenize_text_batch(text_batch).to(model_batch.x.device)
+        # SENTENCE_TRANSFORMERS
+        with torch.no_grad():
+            text_batch = self.sentences_encoder.encode(text_batch, convert_to_tensor=True).to(model_batch.x.device)
+        
+        # BERT
+        #text_batch = self.tokenize_text_batch(text_batch).to(model_batch.x.device)
+        #with torch.no_grad():
+        #    text_batch = self.bert_model(**text_batch).pooler_output
         
 
         model_embed, text_embed = self(model_batch, text_batch, f)
@@ -119,7 +141,14 @@ class Learner(pl.LightningModule):
 
         # model_batch = Batch.from_data_list(model_batch)
         #text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)#[:, 1:3]
-        text_batch = self.tokenize_text_batch(text_batch).to(model_batch.x.device)
+        # SENTENCE_TRANSFORMERS
+        with torch.no_grad():
+            text_batch = self.sentences_encoder.encode(text_batch, convert_to_tensor=True).to(model_batch.x.device)
+        
+        # BERT
+        #text_batch = self.tokenize_text_batch(text_batch).to(model_batch.x.device)
+        #with torch.no_grad():
+        #    text_batch = self.bert_model(**text_batch).pooler_output
 
         model_embed, text_embed = self(model_batch, text_batch, f)
         # model_embed = self(model_batch, text_batch, f)
@@ -187,7 +216,9 @@ class Learner(pl.LightningModule):
         # optimizer = torch.optim.SGD(self.model.parameters(), lr=cfg.SOLVER.BASE_LR, weight_decay=cfg.SOLVER.WEIGHT_DECAY, momentum=cfg.SOLVER.MOMENTUM)
         # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=cfg.SOLVER.MILESTONE, gamma=0.2)
 
-        list_parameters = list(self.model_encoder.parameters()) + list(self.text_encoder.parameters()) #+ list(self.classifier.parameters())
+        #list_parameters = list(self.model_encoder.parameters()) + list(self.text_encoder.parameters()) #+ list(self.classifier.parameters())
+        #list_parameters = list(self.model_encoder.parameters()) + list(self.text_encoder_head.parameters())
+        list_parameters = list(self.model_encoder.parameters()) + list(self.model_encoder_head.parameters()) + list(self.text_encoder_head.parameters())
         optimizer1 = torch.optim.AdamW(list_parameters, lr=cfg.SOLVER.BASE_LR1, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
         # optimizer2 = torch.optim.AdamW(self.classifier.parameters(), lr=cfg.SOLVER.BASE_LR2, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
         # scheduler1 = get_linear_schedule_with_warmup(optimizer1, num_warmup_steps=cfg.SOLVER.WARMUP_ITERS, num_training_steps=-1)

@@ -26,7 +26,7 @@ class PeriodicCheckpoint(ModelCheckpoint):
 
     def on_train_epoch_end(
         self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs
-    ):
+    ):  
         if (pl_module.current_epoch + 1) % self.every == 0:
             assert self.dirpath is not None
             self.filename = f"model_{pl_module.current_epoch}.ckpt"
@@ -67,16 +67,16 @@ def main():
         )
 
     # create a checkpoint callback
-    checkpoint_callback = ModelCheckpoint(
-        dirpath=cfg.SAVE_DIR,
-        filename='_{val_loss:.3f}',
-        save_top_k=1,
-        monitor='val_loss',
-        mode='min',
-    )
+    #checkpoint_callback = ModelCheckpoint(
+    #    dirpath=cfg.SAVE_DIR,
+    #    filename='_{val_loss:.3f}',
+    #    save_top_k=1,
+    #    monitor='val_loss',
+    #    mode='min',
+    #)
     periodic_checkpoint = PeriodicCheckpoint(cfg.SAVE_DIR, cfg.SAVE_CHECK_EVERY)
 
-    callbacks = [checkpoint_callback]
+    #callbacks = [checkpoint_callback]
 
     # create a trainer
     trainer = pl.Trainer(
@@ -85,13 +85,13 @@ def main():
         max_epochs=cfg.SOLVER.EPOCHS,
         max_steps=-1,
         log_every_n_steps=50,
-        accumulate_grad_batches=8,
+        #accumulate_grad_batches=8,
         sync_batchnorm=True,
         strategy="ddp_find_unused_parameters_true", # ddp_find_unused_parameters_true
         # plugins=DDPPlugin(find_unused_parameters=True),
         num_nodes=1,
         logger=logger,
-        callbacks=callbacks,
+        #callbacks=callbacks,
         check_val_every_n_epoch=1,
         # val_check_interval=500,
         precision=16,
