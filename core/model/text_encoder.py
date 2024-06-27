@@ -2,22 +2,19 @@ import torch
 from core.configs import cfg
 
 class TextEncoder(torch.nn.Module):
-    def __init__(self, vocab_size, embed_dim=64, num_heads=4, num_layers=2, dropout=0.1):
+    def __init__(self, vocab_size, input_dim=64, num_heads=4, num_layers=2, dropout=0.1):
         super(TextEncoder, self).__init__()
-        self.embed_scale = embed_dim ** 0.5
-        self.embed_tokens = torch.nn.Embedding(vocab_size, embed_dim)
-        self.pos_embed = torch.nn.Parameter(torch.randn((1, 3, embed_dim)))
-        self.seg_embed = torch.nn.Parameter(torch.randn((2, embed_dim)))
+        self.embed_scale = input_dim ** 0.5
+        self.embed_tokens = torch.nn.Embedding(vocab_size, input_dim)
+        self.pos_embed = torch.nn.Parameter(torch.randn((1, 3, input_dim)))
+        # self.seg_embed = torch.nn.Parameter(torch.randn((2, input_dim)))
         self.dropout = torch.nn.Dropout(dropout)
 
         self.layers = torch.nn.ModuleList([])
         for i in range(num_layers):
-            if i == num_layers - 1:
-                embed_dim = cfg.MODEL.OUTPUT_DIM
-
             self.layers.append(
                 torch.nn.TransformerEncoderLayer(
-                    d_model=embed_dim,
+                    d_model=input_dim,
                     nhead=num_heads,
                     batch_first=True,
                 )
@@ -26,8 +23,8 @@ class TextEncoder(torch.nn.Module):
     def forward(self, x):
         x = self.embed_tokens(x) * self.embed_scale
         x = x + self.pos_embed
-        x[:, 0] = x[:, 0] + self.seg_embed[0]
-        x[:, 1:] = x[:, 1:] + self.seg_embed[1]
+        # x[:, :1] = x[:, :1] + self.seg_embed[0][None, None, :]
+        # x[:, 1:] = x[:, 1:] + self.seg_embed[1][None, None, :]
         x = self.dropout(x)
 
         for layer in self.layers:

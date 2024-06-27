@@ -27,7 +27,7 @@ class ModelDataset(torch.utils.data.Dataset):
         # self.max_num_ckpt = torch.load(self.path + self.file_list[0])['pdata'].shape[0]
         self.max_num_ckpt = 2
 
-        # model = torch.load("mnist/NND_mnist_run1.pt", map_location='cpu')['model'].module  # TODO, we need to save module when we create data
+        # model = torch.load("mnist/NND_mnist_run1.pt", map_location='cpu')['model'].module
         self.model = {
             "MLP3" : nn.Sequential(
                         nn.Linear(1*28*28, 50),

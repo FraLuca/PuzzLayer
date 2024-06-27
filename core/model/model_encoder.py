@@ -6,12 +6,18 @@ from core.model.utils.graph_utils.graph_pooling import *
 from core.configs import cfg
 
 class ModelEncoder(torch.nn.Module):
-    def __init__(self, input_dim=1, output_dim=1):
+    def __init__(self, input_dim=1, output_dim=1, dropout=0.2):
         super(ModelEncoder, self).__init__()
 
-        self.encoder = NodeEdgeFeatEncoder(64)
-        mpnn = EdgeMPNN(64, 64, 76, 64, 64, 3, dropout=0.2)
-        pooling = MLPEdgeReadout(64, 64, cfg.MODEL.OUTPUT_DIM)
+        self.encoder = NodeEdgeFeatEncoder(hidden_dim=input_dim)
+        mpnn = EdgeMPNN(node_in_dim=input_dim,
+                        edge_in_dim=input_dim,
+                        hidden_dim=76,
+                        node_out_dim=64,
+                        edge_out_dim=64,
+                        num_layers=3,
+                        dropout=dropout)
+        pooling = MLPEdgeReadout(in_dim=64, hidden_dim=64, out_dim=output_dim)
         self.gnn = GNNwEdgeReadout(mpnn, pooling)
 
     def forward(self, batch, f=None):

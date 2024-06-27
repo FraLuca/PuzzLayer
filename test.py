@@ -1,9 +1,5 @@
-import os
 import random
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
-# from pytorch_lightning.plugins import DDPPlugin
 
 import setproctitle
 from core.learner import Learner
@@ -16,7 +12,6 @@ import shutil
 
 import warnings
 warnings.filterwarnings('ignore')
-# os.environ["NCCL_P2P_DISABLE"] = "1"
 
 def main():
 
@@ -62,7 +57,7 @@ def main():
     # train the model
     trainer.test(learner, ckpt_path=cfg.MODEL_TO_TEST)
     
-    print("Training Over")
+    print("Testing Over")
 
 
 
