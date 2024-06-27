@@ -3,7 +3,7 @@ from core.configs import cfg
 from transformers import BertTokenizer
 
 class TextEncoder(torch.nn.Module):
-    def __init__(self, vocab_size, embed_dim=64, num_heads=4, num_layers=2, dropout=0.1):
+    def __init__(self, vocab_size, embed_dim=64, num_heads=1, num_layers=2, dropout=0.1):
         super(TextEncoder, self).__init__()
         self.embed_scale = embed_dim ** 0.5
         self.embed_tokens = torch.nn.Embedding(vocab_size, embed_dim)
@@ -23,14 +23,19 @@ class TextEncoder(torch.nn.Module):
                     d_model=embed_dim,
                     nhead=num_heads,
                     batch_first=True,
+                    dropout=dropout,
+                    
                 )
             )
 
+            #self.layers.append(torch.nn.LayerNorm(embed_dim))
+
     def forward(self, x):
-        sentence_embeddings = self.create_sentence_attention_mask(x['input_ids'])
-        sentence_embeddings = self.embed_sentence(sentence_embeddings)
+        #sentence_embeddings = self.create_sentence_attention_mask(x['input_ids'])
+        #sentence_embeddings = self.embed_sentence(sentence_embeddings)
         x = self.embed_tokens(x['input_ids']) * self.embed_scale
-        x = x + sentence_embeddings + self.pos_embed
+        #x = x + sentence_embeddings + self.pos_embed
+        x = x + self.pos_embed
         x = self.dropout(x)
 
         for layer in self.layers:

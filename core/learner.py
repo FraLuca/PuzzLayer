@@ -20,11 +20,27 @@ class Learner(pl.LightningModule):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
+        output_dim = cfg.MODEL.OUTPUT_DIM_HEAD if cfg.MODEL.MAKE_MODEL_ENCODER_HEAD else cfg.MODEL.OUTPUT_DIM
         self.model_encoder = ModelEncoder()
+        if self.cfg.MODEL.MAKE_MODEL_ENCODER_HEAD:
+            self.model_encoder_head = nn.Sequential(nn.ReLU(), 
+                                                    nn.Linear(cfg.MODEL.OUTPUT_DIM, cfg.MODEL.OUTPUT_DIM_HEAD),
+                                                    nn.BatchNorm1d(cfg.MODEL.OUTPUT_DIM_HEAD),
+                                                    nn.ReLU(),
+                                                    nn.Linear(cfg.MODEL.OUTPUT_DIM_HEAD, cfg.MODEL.OUTPUT_DIM_HEAD)
+                                                    )
 
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         vocab_size = self.tokenizer.vocab_size
-        self.text_encoder = TextEncoder(vocab_size, embed_dim=64, num_heads=1, num_layers=2, dropout=0.2)
+        self.text_encoder = TextEncoder(vocab_size, embed_dim=cfg.MODEL.OUTPUT_DIM, num_heads=1, num_layers=2, dropout=0.2)
+        if self.cfg.MODEL.MAKE_TEXT_HEAD:
+            self.text_encoder_head = nn.Sequential(nn.ReLU(), 
+                                                    nn.Linear(cfg.MODEL.OUTPUT_DIM, cfg.MODEL.OUTPUT_DIM_HEAD),
+                                                    nn.BatchNorm1d(cfg.MODEL.OUTPUT_DIM_HEAD),
+                                                    nn.ReLU(),
+                                                    nn.Linear(cfg.MODEL.OUTPUT_DIM_HEAD, cfg.MODEL.OUTPUT_DIM_HEAD)
+                                                    )
+        
 
         self.criterion = CLIPLoss()
         # self.criterion = nn.CrossEntropyLoss()
@@ -87,8 +103,9 @@ class Learner(pl.LightningModule):
         
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         # select only indices of the list f that contain "CNN2"
-        cnn2_indices = [i for i in range(len(f)) if "CNN2" in f[i]]
-        acc = self.compute_accuracy_alignment(model_embed[cnn2_indices], text_embed[cnn2_indices])
+        #cnn2_indices = [i for i in range(len(f)) if "CNN2" in f[i]]
+        #acc = self.compute_accuracy_alignment(model_embed[cnn2_indices], text_embed[cnn2_indices])
+        acc = self.compute_accuracy_alignment(model_embed, text_embed)
         self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         # self.manual_backward(loss)
@@ -118,8 +135,9 @@ class Learner(pl.LightningModule):
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         # select only indices of the list f that contain "CNN2"
-        cnn2_indices = [i for i in range(len(f)) if "CNN2" in f[i]]
-        acc = self.compute_accuracy_alignment(model_embed[cnn2_indices], text_embed[cnn2_indices])
+        #cnn2_indices = [i for i in range(len(f)) if "CNN2" in f[i]]
+        #acc = self.compute_accuracy_alignment(model_embed[cnn2_indices], text_embed[cnn2_indices])
+        acc = self.compute_accuracy_alignment(model_embed, text_embed)
         self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return loss
