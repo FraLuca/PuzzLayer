@@ -6,7 +6,7 @@ MODEL:
   OUTPUT_DIM_HEAD: 64
 
 WANDB:
-  ENABLE: True
+  ENABLE: False
   GROUP: "alignment"
   PROJECT: "PuzzLayer"
   ENTITY: "pinlab-sapienza"
