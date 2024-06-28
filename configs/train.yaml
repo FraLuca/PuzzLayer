@@ -4,10 +4,11 @@ MODEL:
   MAKE_TEXT_HEAD: True
   MAKE_MODEL_ENCODER_HEAD: True
   OUTPUT_DIM_HEAD: 64
+  ALIGNMENT: False
 
 WANDB:
   ENABLE: False
-  GROUP: "alignment"
+  GROUP: "reco"
   PROJECT: "PuzzLayer"
   ENTITY: "pinlab-sapienza"
 
@@ -16,12 +17,12 @@ DATASETS:
   TEST: "mydatasets/validNEW/"
 
 SOLVER:
- GPUS: [1]
+ GPUS: [2]
  NUM_WORKERS: 4
  BASE_LR1: 0.0001
  BASE_LR2: 0. #0.0001
  MILESTONE: [10,20]
- BATCH_SIZE: 105
+ BATCH_SIZE: 50
  EPOCHS: 30000
  WEIGHT_DECAY: 0. #0.0005
  MOMENTUM: 0.9
@@ -33,7 +34,7 @@ SOLVER:
  BATCH_SIZE_VAL: 30
  
 
-NAME: "FullText_BERTpretrained_ModelEncNOPretr_smalldata_visnu"
+NAME: "reco"
 OUTPUT_DIR: "results/debug"
 PRETRAINED_MODEL_ENCODER: False #"results/debug/dgx_lr5e-4_nowd/_val_acc=0.877.ckpt" # None
 SAVE_CHECK_EVERY: 200

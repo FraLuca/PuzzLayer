@@ -75,4 +75,55 @@ class TextEncoder(torch.nn.Module):
 
         return final[0]
 
- 
+
+
+class TextEncoderCustom(torch.nn.Module):
+    def __init__(self, input_dim=64, num_heads=4, num_layers=2, dropout=0.1):
+        super(TextEncoderCustom, self).__init__()
+        self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        vocab_size = self.tokenizer.vocab_size
+
+        self.max_length = 200
+
+        self.embed_scale = input_dim ** 0.5
+        self.embed_tokens = torch.nn.Embedding(vocab_size, input_dim)
+        self.pos_embed = torch.nn.Parameter(torch.randn((1, self.max_length, input_dim)))
+        # self.seg_embed = torch.nn.Parameter(torch.randn((2, input_dim)))
+        self.dropout = torch.nn.Dropout(dropout)
+
+        self.layers = torch.nn.ModuleList([])
+        for i in range(num_layers):
+            self.layers.append(
+                torch.nn.TransformerEncoderLayer(
+                    d_model=input_dim,
+                    nhead=num_heads,
+                    batch_first=True,
+                )
+            )
+
+    def forward(self, x):
+        x = self.tokenize_text_batch(x)['input_ids'].to(self.embed_tokens.weight.device)
+        x = self.embed_tokens(x) * self.embed_scale
+        x = x + self.pos_embed
+        # x[:, :1] = x[:, :1] + self.seg_embed[0][None, None, :]
+        # x[:, 1:] = x[:, 1:] + self.seg_embed[1][None, None, :]
+        x = self.dropout(x)
+
+        for layer in self.layers:
+            x = layer(x)
+
+        return x.mean(dim=1)
+        # return x[:,0]
+
+
+
+
+
+    def tokenize_text_batch(self, text_batch):
+        return self.tokenizer(
+            text_batch,
+            padding='max_length',   # Aggiungere padding se la sequenza è più corta della lunghezza fissa
+            truncation=True,        # Troncare la sequenza se è più lunga della lunghezza fissa
+            max_length=self.max_length,  # Lunghezza fissa desiderata
+            return_tensors='pt'     # Restituire tensori PyTorch
+        )

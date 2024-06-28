@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from core.model.build import build_model, init_model
 from core.model.model_encoder import ModelEncoder
-from core.model.text_encoder import TextEncoder
+from core.model.text_encoder import TextEncoder, TextEncoderCustom
 from core.model.model_decoder import ModelDecoder
 from core.dataset.build import build_dataset, custom_collate_fn
 from core.model.utils.loss import CLIPLoss
@@ -16,6 +16,9 @@ from torch_geometric.data import Batch
 from transformers import BertTokenizer, get_linear_schedule_with_warmup, BertModel
 from torch.optim.lr_scheduler import LinearLR
 from sklearn.metrics import accuracy_score
+from torch_geometric.data import Data, Batch
+
+from core.utils.model_testing import create_sequential_from_graph
 
 
 
@@ -23,6 +26,7 @@ class Learner(pl.LightningModule):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
+        self.alignment = cfg.MODEL.ALIGNMENT
         output_dim = cfg.MODEL.OUTPUT_DIM_HEAD if cfg.MODEL.MAKE_MODEL_ENCODER_HEAD else cfg.MODEL.OUTPUT_DIM
         self.model_encoder = ModelEncoder()
         # put requres_grad to False
@@ -39,8 +43,15 @@ class Learner(pl.LightningModule):
 
         #vocab_size = self.tokenizer.vocab_size
         self.text_encoder = TextEncoder()
+        #self.text_encoder = TextEncoderCustom()
 
-        self.criterion = CLIPLoss()
+
+        self.EdgeRecoTextLoss = nn.SmoothL1Loss()
+        self.NodeRecoTextLoss = nn.SmoothL1Loss()
+        self.EdgeRecoModelLoss = nn.SmoothL1Loss()
+        self.NodeRecoModelLoss = nn.SmoothL1Loss()
+        self.LatentLoss = nn.SmoothL1Loss()
+        #self.criterion = CLIPLoss()
         # self.criterion = nn.CrossEntropyLoss()
 
         # self.classifier = nn.Sequential(nn.ReLU(), nn.Linear(cfg.MODEL.OUTPUT_DIM, cfg.MODEL.OUTPUT_DIM//2),
@@ -71,11 +82,14 @@ class Learner(pl.LightningModule):
 
     def forward(self, model_batch, text_batch, f=None):
         model_embed = self.model_encoder(model_batch, f)
-        text_embed = self.text_encoder(text_batch).squeeze(0)
-        model_decoder = self.model_decoder(text_embed, model_batch)
-                                            #edge_index=model_batch.edge_index, 
-                                           #batch=model_batch.batch, num_nodes=model_batch.edge_attr.shape[0])
-        return model_embed, text_embed
+        if self.alignment:
+            text_embed = self.text_encoder(text_batch).squeeze(0)
+            model_decoded_fromText = self.model_decoder(text_embed, model_batch)
+        else:
+            text_embed = None
+            model_decoded_fromText = None
+        model_decoded_fromModel = self.model_decoder(model_embed, model_batch)
+        return model_embed, text_embed, model_decoded_fromModel, model_decoded_fromText
 
     def training_step(self, batch, batch_idx):
         # opt1 = self.optimizers()
@@ -88,25 +102,53 @@ class Learner(pl.LightningModule):
 
         
 
-        model_embed, text_embed = self(model_batch, text_batch, f)
+        model_embed, text_embed, model_decoded_fromModel, model_decoded_fromText = self(model_batch, text_batch, f)
         # model_embed = self(model_batch, text_batch, f)
         # class_logits = self.classifier(model_embed)
-        
-        loss = self.criterion(model_embed, text_embed)
-        # loss = self.criterion(class_logits, text_batch.float())
 
-        # compute accuracy for multi label classification (2 classes)
-        # acc = torch.topk(class_logits, 2).indices
-        # covert acc to one hot
-        # acc = torch.zeros_like(class_logits).scatter(1, acc, 1)
-        # acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
+        model_batch_fromModel = model_batch.clone()
+        model_batch_fromModel.x = model_decoded_fromModel[0]
+        model_batch_fromModel.edge_attr = model_decoded_fromModel[1]
+        # RECO LOSSES
+        # 1. smoothl1loss reco model from model - model gt
+        node_reco_model = self.NodeRecoModelLoss(model_decoded_fromModel[0], model_batch.x)
+        edge_reco_model = self.EdgeRecoModelLoss(model_decoded_fromModel[1], model_batch.edge_attr)
+        reco_loss = node_reco_model + edge_reco_model
+
+        if self.alignment:
+            model_batch_fromText = model_batch.clone()
+            model_batch_fromText.x = model_decoded_fromText[0]
+            model_batch_fromText.edge_attr = model_decoded_fromText[1]
+
+            # 2. smoothl1loss reco model from text - model gt
+            node_reco_text = self.NodeRecoTextLoss(model_decoded_fromText[0], model_batch.x)
+            edge_reco_text = self.EdgeRecoTextLoss(model_decoded_fromText[1], model_batch.edge_attr)
+            reco_loss += node_reco_text + edge_reco_text
+
+            # LATENT LOSSES
+            # 3. LATENT TEXT - LATENT MODEL
+            latent_loss = self.LatentLoss(model_embed, text_embed)
+
+        
+            loss = reco_loss + 1*latent_loss
+        else:
+            loss = reco_loss
+        
         
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('node_reco_model', node_reco_model, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('edge_reco_model', edge_reco_model, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('reco_loss', reco_loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+
+        if self.alignment:
+            self.log('node_reco_text', node_reco_text, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('edge_reco_text', edge_reco_text, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('latent_loss', latent_loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         # select only indices of the list f that contain "CNN2"
         #cnn2_indices = [i for i in range(len(f)) if "CNN2" in f[i]]
-        #acc = self.compute_accuracy_alignment(model_embed[cnn2_indices], text_embed[cnn2_indices])
-        acc = self.compute_accuracy_alignment(model_embed, text_embed)
-        self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        #acc = self.compute_accuracy_alignment(model_embed[cnn2_indices], text_embed[cnn2_indices]
+            acc = self.compute_accuracy_alignment(model_embed, text_embed)
+            self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         # self.manual_backward(loss)
         # opt1.step()
@@ -120,24 +162,49 @@ class Learner(pl.LightningModule):
         # model_batch = Batch.from_data_list(model_batch)
 
 
-        model_embed, text_embed = self(model_batch, text_batch, f)
+        model_embed, text_embed, model_decoded_fromModel, model_decoded_fromText = self(model_batch, text_batch, f)
         # model_embed = self(model_batch, text_batch, f)
         # class_logits = self.classifier(model_embed)
         
-        loss = self.criterion(model_embed, text_embed)
-        # loss = self.criterion(class_logits, text_batch.float())
+        model_batch_fromModel = model_batch.clone()
+        model_batch_fromModel.x = model_decoded_fromModel[0]
+        model_batch_fromModel.edge_attr = model_decoded_fromModel[1]
+        # RECO LOSSES
+        # 1. smoothl1loss reco model from model - model gt
+        node_reco_model = self.NodeRecoModelLoss(model_decoded_fromModel[0], model_batch.x)
+        edge_reco_model = self.EdgeRecoModelLoss(model_decoded_fromModel[1], model_batch.edge_attr)
+        reco_loss = node_reco_model + edge_reco_model
 
-        # acc = torch.topk(class_logits, 2).indices
-        # covert acc to one hot
-        # acc = torch.zeros_like(class_logits).scatter(1, acc, 1)
-        # acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
+        if self.alignment:
+            model_batch_fromText = model_batch.clone()
+            model_batch_fromText.x = model_decoded_fromText[0]
+            model_batch_fromText.edge_attr = model_decoded_fromText[1]
+
+            # 2. smoothl1loss reco model from text - model gt
+            node_reco_text = self.NodeRecoTextLoss(model_decoded_fromText[0], model_batch.x)
+            edge_reco_text = self.EdgeRecoTextLoss(model_decoded_fromText[1], model_batch.edge_attr)
+            reco_loss += node_reco_text + edge_reco_text
+
+            # LATENT LOSSES
+            # 3. LATENT TEXT - LATENT MODEL
+            latent_loss = self.LatentLoss(model_embed, text_embed)
+            loss = reco_loss + 1*latent_loss
+        else:
+            loss = reco_loss
+
+        model_orig = text_batch
+        model_reco = create_sequential_from_graph(model_batch_fromModel, model_orig)
+
+        # performances = test_on_mnist(model_reco, model_orig)
+
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         # select only indices of the list f that contain "CNN2"
         #cnn2_indices = [i for i in range(len(f)) if "CNN2" in f[i]]
         #acc = self.compute_accuracy_alignment(model_embed[cnn2_indices], text_embed[cnn2_indices])
-        acc = self.compute_accuracy_alignment(model_embed, text_embed)
-        self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        if self.alignment:
+            acc = self.compute_accuracy_alignment(model_embed, text_embed)
+            self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return loss
 

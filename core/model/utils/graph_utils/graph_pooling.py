@@ -96,6 +96,25 @@ class MLPEdgeReadout(nn.Module):
     def forward(self, edge_index, edge_attr, batch, **kwargs):
         graph_feat = self.pool(edge_index, edge_attr, batch)
         return self.mlp(graph_feat)
+    
+class MLPNodeEdgeReadout(nn.Module):
+    def __init__(self, in_dim, hidden_dim, out_dim, num_layers=2, reduce='mean'):
+        super().__init__()
+        self.node_pool = BasicNodePool(reduce)
+        self.edge_pool = BasicEdgePool(reduce)
+        layers = [nn.Linear(in_dim, hidden_dim)]
+        layers.append(nn.ReLU())
+        for _ in range(num_layers-2):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(hidden_dim, out_dim))
+        self.mlp = nn.Sequential(*layers)
+
+    def forward(self, x, edge_index, edge_attr, batch, **kwargs):
+        node_feat = self.node_pool(x, batch)
+        edge_feat = self.edge_pool(edge_index, edge_attr, batch)
+        graph_feat = torch.cat([node_feat, edge_feat], dim=-1)
+        return self.mlp(graph_feat)
 
 class DSEdgeReadout(nn.Module):
     '''

@@ -20,6 +20,7 @@ def build_dataset(cfg, train=True):
 
 class ModelDataset(torch.utils.data.Dataset):
     def __init__(self, cfg, train=True):
+        self.alignment = cfg.MODEL.ALIGNMENT
         if train:
             self.path = cfg.DATASETS.TRAIN
         else:
@@ -129,26 +130,29 @@ class ModelDataset(torch.utils.data.Dataset):
         x, edge_index, edge_attr = arch_to_graph(arch)
         g_data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
 
-        classes = f.split('_')[2]
-        classes = classes[1:-1] # remove from text "[", "]"
-        classes = classes.replace(",", " ") # substitute "," with " "
+        if self.alignment:
+            classes = f.split('_')[2]
+            classes = classes[1:-1] # remove from text "[", "]"
+            classes = classes.replace(",", " ") # substitute "," with " "
 
-        dataset_text = f.split('_')[1]
+            dataset_text = f.split('_')[1]
 
-        sequential_text = ''
-        for i, layer in enumerate(data):
-            text_repr = layer.__repr__()
-            if 'Conv2d' in text_repr:
-                text_repr = self.replace_conv2d_definitions(text_repr)
-            sequential_text += text_repr
-            if i != len(data) - 1:
-                sequential_text += ' -> '
-            else:
-                sequential_text += ' [SEP] '
+            sequential_text = ''
+            for i, layer in enumerate(data):
+                text_repr = layer.__repr__()
+                if 'Conv2d' in text_repr:
+                    text_repr = self.replace_conv2d_definitions(text_repr)
+                sequential_text += text_repr
+                if i != len(data) - 1:
+                    sequential_text += ' -> '
+                else:
+                    sequential_text += ' [SEP] '
 
-        
-        # put the text in the format "sequential_text [SEP] dataset classes"
-        text = sequential_text + dataset_text + ' ' + classes
+            
+            # put the text in the format "sequential_text [SEP] dataset classes"
+            text = sequential_text + dataset_text + ' ' + classes
+        else:
+            text = data
 
         # text = self.couples_to_onehot[text]
 
