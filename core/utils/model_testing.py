@@ -5,7 +5,7 @@ import os
 
 def create_sequential_from_graph(graphs, original_sequentials):
     all_models = []
-    for i, gra in enumerate(graphs):
+    for i in range(len(graphs)):
         arch = sequential_to_arch(original_sequentials[i])
 
         new_arch = graph_to_arch(arch, graphs[i].edge_attr[:,0])

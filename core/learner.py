@@ -195,6 +195,26 @@ class Learner(pl.LightningModule):
         model_orig = text_batch
         model_reco = create_sequential_from_graph(model_batch_fromModel, model_orig)
 
+        # Compute loss between original and reconstructed models
+        # itern on state dict and compute loss for each parameter
+        # model orig is a list
+        mse_model = 0
+        for i in range(len(model_orig)):
+            flattened_weights_orig = []
+            flattened_weights_reco = []
+            for key, value in model_orig[i].state_dict().items():
+                flattened_weights_orig.append(value.flatten())
+                flattened_weights_reco.append(model_reco[i].state_dict()[key].flatten())
+            flattened_weights_orig = torch.cat(flattened_weights_orig)
+            flattened_weights_reco = torch.cat(flattened_weights_reco)
+            mse_model += F.mse_loss(flattened_weights_orig, flattened_weights_reco)
+        mse_model /= len(model_orig)
+
+        self.log('val_mse_model', mse_model, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+
+
+        
+
         # performances = test_on_mnist(model_reco, model_orig)
 
 
