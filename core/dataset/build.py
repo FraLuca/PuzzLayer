@@ -25,32 +25,9 @@ class ModelDataset(torch.utils.data.Dataset):
             self.path = cfg.DATASETS.TEST
         self.file_list = os.listdir(self.path)
         # self.max_num_ckpt = torch.load(self.path + self.file_list[0])['pdata'].shape[0]
-        self.max_num_ckpt = 2
+        self.max_num_ckpt = 1
 
         # model = torch.load("mnist/NND_mnist_run1.pt", map_location='cpu')['model'].module  # TODO, we need to save module when we create data
-        self.model = {
-            "MLP3" : nn.Sequential(
-                        nn.Linear(1*28*28, 50),
-                        nn.ReLU(),
-                        nn.Linear(50, 25),
-                        nn.ReLU(),
-                        nn.Linear(25, 10)
-                    ),
-            "MLP2" : nn.Sequential(
-                        nn.Linear(784, 64),
-                        nn.ReLU(),
-                        nn.Linear(64, 10)
-                    ),
-            "MLP4" : nn.Sequential(
-                        nn.Linear(784, 50),
-                        nn.ReLU(),
-                        nn.Linear(50, 25),
-                        nn.ReLU(),
-                        nn.Linear(25, 25),
-                        nn.ReLU(),
-                        nn.Linear(25, 10)
-                    ),
-        }
     
         self.couples_to_onehot = {
             "0 1": [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -107,13 +84,8 @@ class ModelDataset(torch.utils.data.Dataset):
 
         f = self.file_list[idx]
         rnd_ckpt_idx = torch.randint(0, self.max_num_ckpt, (1,)).item()
-        modeltype = f[:4]
 
-        if "MLP" in modeltype:
-            data = torch.load(self.path + f)['pdata'][rnd_ckpt_idx]        
-            data = partial_reverse_tomodel(data, self.model[modeltype])
-        else:
-            data = torch.load(self.path + f, map_location="cpu")['pdata'][rnd_ckpt_idx]
+        data = torch.load(self.path + f, map_location="cpu")['pdata'][rnd_ckpt_idx]
         
         for param in data.parameters():
             param.requires_grad = False

@@ -33,6 +33,7 @@ class Learner(pl.LightningModule):
                                         nn.ReLU(), nn.Linear(cfg.MODEL.OUTPUT_DIM//2, cfg.MODEL.NUM_CLASSES))
 
         if cfg.PRETRAINED_MODEL_ENCODER:
+            print(f"Loading pretrained model encoder from {cfg.PRETRAINED_MODEL_ENCODER}")
             self.load_checkpoint(cfg.PRETRAINED_MODEL_ENCODER)
         
         self.save_hyperparameters(cfg)
@@ -70,7 +71,7 @@ class Learner(pl.LightningModule):
         # compute accuracy for multi label classification (2 classes)
         acc = torch.topk(class_logits, 2).indices
         # covert acc to one hot
-        acc = torch.zeros_like(class_logits).scatter(1, acc, 1)
+        acc = torch.zeros_like(class_logits).scatter(1, acc, 1).to(dtype=torch.float32)
         acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
         
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
@@ -98,7 +99,7 @@ class Learner(pl.LightningModule):
         # acc = (class_logits.argmax(dim=1) == text_batch).float().mean()
         acc = torch.topk(class_logits, 2).indices
         # covert acc to one hot
-        acc = torch.zeros_like(class_logits).scatter(1, acc, 1)
+        acc = torch.zeros_like(class_logits).scatter(1, acc, 1).to(dtype=torch.float32)
         acc = accuracy_score(text_batch.cpu().numpy(), acc.cpu().numpy())
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)

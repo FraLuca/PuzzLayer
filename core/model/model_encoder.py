@@ -12,7 +12,8 @@ class ModelEncoder(torch.nn.Module):
         self.encoder = NodeEdgeFeatEncoder(64)
         mpnn = EdgeMPNN(64, 64, 76, 64, 64, 3, dropout=0.2)
         pooling = MLPEdgeReadout(64, 64, cfg.MODEL.OUTPUT_DIM)
-        self.gnn = GNNwEdgeReadout(mpnn, pooling)
+        # pooling = DSNodeEdgeReadout(64, 64, cfg.MODEL.OUTPUT_DIM)
+        self.gnn = GNNwEdgeReadout(mpnn, pooling, use_nodes=False)
 
     def forward(self, batch, f=None):
         encoded_x, encoded_edge = self.encoder(batch.x, batch.edge_attr)

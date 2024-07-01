@@ -5,9 +5,10 @@ import shutil
 from pprint import pprint
 
 # Path to the datasets folder
-path = 'datasets/trainNEW/'
+path = 'datasets/trainMLP/'
 
-counter = {"CNN2":{}, "CNN3":{}, "CNN4":{}}
+counterCNN = {"CNN2":{}, "CNN3":{}, "CNN4":{}}
+counterMLP = {"MLP2":{}, "MLP3":{}, "MLP4":{}}
 
 # Iterate over files in the datasets folder
 for filename in os.listdir(path):
@@ -20,13 +21,13 @@ for filename in os.listdir(path):
         print(filename)
         # os.remove(path+filename)
 
-    # if net_couples not in counter[net_layers]:
-    #     counter[net_layers][net_couples] = 0
+    if net_couples not in counterMLP[net_layers]:
+        counterMLP[net_layers][net_couples] = 0
     
-    # if counter[net_layers][net_couples] < 20:
-    #     if net_accuracy >= 0.9:
-    #         shutil.copy(path+filename, 'datasets/trainSMALLER/'+filename)
-    #         counter[net_layers][net_couples] += 1
+    if counterMLP[net_layers][net_couples] < 20:
+        if net_accuracy >= 0.9:
+            shutil.copy(path+filename, 'datasets/trainMLPSUBSET/'+filename)
+            counterMLP[net_layers][net_couples] += 1
 
 
-pprint(counter)
+pprint(counterMLP)
