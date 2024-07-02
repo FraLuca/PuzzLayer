@@ -96,7 +96,7 @@ class Learner(pl.LightningModule):
         # opt1.zero_grad()
         # scheduler1 = self.lr_schedulers()
 
-        model_batch, text_batch, f = batch
+        model_batch, text_batch, f, sequential_original = batch
 
         # model_batch = Batch.from_data_list(model_batch)
 
@@ -157,7 +157,7 @@ class Learner(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        model_batch, text_batch, f = batch
+        model_batch, text_batch, f, sequential_original = batch
 
         # model_batch = Batch.from_data_list(model_batch)
 
@@ -189,10 +189,12 @@ class Learner(pl.LightningModule):
             # 3. LATENT TEXT - LATENT MODEL
             latent_loss = self.LatentLoss(model_embed, text_embed)
             loss = reco_loss + 1*latent_loss
+
+            model_orig = sequential_original
         else:
             loss = reco_loss
 
-        model_orig = text_batch
+            model_orig = text_batch
         model_reco = create_sequential_from_graph(model_batch_fromModel, model_orig)
 
         # Compute loss between original and reconstructed models
@@ -275,7 +277,7 @@ class Learner(pl.LightningModule):
 
         #list_parameters = list(self.model_encoder.parameters()) + list(self.text_encoder.parameters()) #+ list(self.classifier.parameters())
         #list_parameters = list(self.model_encoder.parameters()) + list(self.text_encoder_head.parameters())
-        list_parameters = list(self.model_encoder.parameters()) + list(self.text_encoder.parameters())
+        list_parameters = list(self.model_encoder.parameters()) + list(self.text_encoder.parameters()) + list(self.model_decoder.parameters())
         optimizer1 = torch.optim.AdamW(list_parameters, lr=cfg.SOLVER.BASE_LR1, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
         # optimizer2 = torch.optim.AdamW(self.classifier.parameters(), lr=cfg.SOLVER.BASE_LR2, weight_decay=cfg.SOLVER.WEIGHT_DECAY)
         # scheduler1 = get_linear_schedule_with_warmup(optimizer1, num_warmup_steps=cfg.SOLVER.WARMUP_ITERS, num_training_steps=-1)

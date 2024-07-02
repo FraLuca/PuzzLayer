@@ -151,22 +151,24 @@ class ModelDataset(torch.utils.data.Dataset):
             
             # put the text in the format "sequential_text [SEP] dataset classes"
             text = sequential_text + dataset_text + ' ' + classes
+            sequential = data
         else:
             text = data
 
         # text = self.couples_to_onehot[text]
 
-        return g_data, text, f
+        return g_data, text, f, sequential
 
 
 def custom_collate_fn(batch):
     data_list = [d[0] for d in batch]
     text_list = [d[1] for d in batch]
     f_list = [d[2] for d in batch]
+    sequential = [d[3] for d in batch]
 
     # for data in data_list:
     #     for key, value in data:
     #         if torch.is_tensor(value):
     #             value.requires_grad_(False)
 
-    return Batch.from_data_list(data_list), text_list, f_list
+    return Batch.from_data_list(data_list), text_list, f_list, sequential
