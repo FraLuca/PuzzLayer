@@ -34,7 +34,7 @@ SOLVER:
  BATCH_SIZE_VAL: 30
  
 
-NAME: "reco_align_task"
+NAME: "reco_align_task_w/mse_text"
 OUTPUT_DIR: "results/debug"
 PRETRAINED_MODEL_ENCODER: False #"results/debug/dgx_lr5e-4_nowd/_val_acc=0.877.ckpt" # None
 SAVE_CHECK_EVERY: 200
