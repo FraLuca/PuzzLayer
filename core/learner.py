@@ -197,20 +197,36 @@ class Learner(pl.LightningModule):
             model_orig = text_batch
         model_reco = create_sequential_from_graph(model_batch_fromModel, model_orig)
 
+        if self.alignment:
+            model_reco_text = create_sequential_from_graph(model_batch_fromText, model_orig)
+
         # Compute loss between original and reconstructed models
         # itern on state dict and compute loss for each parameter
         # model orig is a list
         mse_model = 0
+        if self.alignment:
+            mse_text = 0
         for i in range(len(model_orig)):
             flattened_weights_orig = []
             flattened_weights_reco = []
+            flattened_weights_text = []
             for key, value in model_orig[i].state_dict().items():
                 flattened_weights_orig.append(value.flatten())
                 flattened_weights_reco.append(model_reco[i].state_dict()[key].flatten())
+                if self.alignment:
+                    flattened_weights_text.append(model_reco_text[i].state_dict()[key].flatten())
             flattened_weights_orig = torch.cat(flattened_weights_orig)
             flattened_weights_reco = torch.cat(flattened_weights_reco)
+            if self.alignment:
+                flattened_weights_text = torch.cat(flattened_weights_text)
             mse_model += F.mse_loss(flattened_weights_orig, flattened_weights_reco)
+            if self.alignment:
+                mse_text += F.mse_loss(flattened_weights_orig, flattened_weights_text)
+
         mse_model /= len(model_orig)
+        if self.alignment:
+            mse_text /= len(model_orig)
+            self.log('val_mse_text', mse_text, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         self.log('val_mse_model', mse_model, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
