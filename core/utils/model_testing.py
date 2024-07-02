@@ -1,6 +1,9 @@
 from core.model.utils.graph_construct.model_arch_graph import *
 import torch
 import os
+from torch.utils.data import DataLoader, Subset
+from torchvision import datasets, transforms
+
 
 
 def create_sequential_from_graph(graphs, original_sequentials):
@@ -12,6 +15,42 @@ def create_sequential_from_graph(graphs, original_sequentials):
         new_model = arch_to_sequential(new_arch, deepcopy(original_sequentials[i]))
         all_models.append(new_model)
     return all_models
-        
+
+
+def test_on_mnist(reco_model, orig_model, filenames):
+
+    # load MNIST dataset
+    mnist_test = datasets.MNIST('data',
+                                train=False,
+                                download=True,
+                                transform=transforms.Compose(
+                [transforms.Resize((28, 28)), transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+            ))
+
+    for i in range(len(reco_model)):
+        orig_model[i].eval()
+        reco_model[i].eval()
+        classes = filenames[i].split('_')[2]
+        device = next(orig_model[i].parameters()).device
+
+        indices = [i for i, (_, label) in enumerate(mnist_test) if str(label) in classes]
+        mnist_subset = Subset(mnist_test, indices)
+        test_loader = DataLoader(mnist_subset, batch_size=64, shuffle=False, num_workers=4, pin_memory=True)
+
+        orig_correct = 0
+        reco_correct = 0
+        for data, target in test_loader:
+            data, target = data.half().to(device), target.to(device)
+            output = orig_model[i](data)
+            orig_correct += output.argmax(dim=1).eq(target).sum().item()
+            output = reco_model[i](data)
+            reco_correct += output.argmax(dim=1).eq(target).sum().item()
+
+        print(filenames[i])
+        print(f"Original model accuracy: {orig_correct/len(mnist_subset)}")
+        print(f"Reconstructed model accuracy: {reco_correct/len(mnist_subset)}")
+        print()
+
+    return
 
 

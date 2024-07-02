@@ -188,3 +188,4 @@ wandb/
 Dockerfile
 mydatasets/
 *.ckpt
+data/

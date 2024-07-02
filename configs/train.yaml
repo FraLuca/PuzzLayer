@@ -7,14 +7,14 @@ MODEL:
   ALIGNMENT: True 
 
 WANDB:
-  ENABLE: True
+  ENABLE: False
   GROUP: "reco"
   PROJECT: "PuzzLayer"
   ENTITY: "pinlab-sapienza"
 
 DATASETS:
-  TRAIN: "mydatasets/trainCNN1pertypecouple/"   # mnist, cifar10, cifar100, imagenette, imagenet
-  TEST: "mydatasets/validCNN/"
+  TRAIN: "datasets/trainCNN1pertypecouple/"   # mnist, cifar10, cifar100, imagenette, imagenet
+  TEST: "datasets/validCNN/"
 
 SOLVER:
  GPUS: [1]

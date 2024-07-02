@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sentence_transformers import SentenceTransformer
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from core.model.build import build_model, init_model
@@ -18,7 +17,7 @@ from torch.optim.lr_scheduler import LinearLR
 from sklearn.metrics import accuracy_score
 from torch_geometric.data import Data, Batch
 
-from core.utils.model_testing import create_sequential_from_graph
+from core.utils.model_testing import *
 
 
 
@@ -217,7 +216,7 @@ class Learner(pl.LightningModule):
 
         
 
-        # performances = test_on_mnist(model_reco, model_orig)
+        performances = test_on_mnist(model_reco, model_orig, f)
 
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
