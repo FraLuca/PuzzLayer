@@ -151,10 +151,11 @@ class ModelDataset(torch.utils.data.Dataset):
             
             # put the text in the format "sequential_text [SEP] dataset classes"
             text = sequential_text + dataset_text + ' ' + classes
-            sequential = data
+            
         else:
             text = data
-
+            
+        sequential = data
         # text = self.couples_to_onehot[text]
 
         return g_data, text, f, sequential

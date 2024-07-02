@@ -33,6 +33,28 @@ class NodeUnpooler(nn.Module):
         node_feat_unpooled = graph_feat[node_batch]
         return node_feat_unpooled
     
+class EdgeUnpoolerOperation(nn.Module):
+    def __init__(self):
+        super(EdgeUnpoolerOperation, self).__init__()
+        in_dim = 64
+        hidden_dim = 64
+        out_dim = 64
+        num_layers = 2
+        layers = [nn.Linear(in_dim, hidden_dim)]
+        layers.append(nn.ReLU())
+        for _ in range(num_layers-2):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(hidden_dim, out_dim))
+        self.mlp = nn.Sequential(*layers)
+
+        self.edge_unpooler = EdgeUnpooler()
+        
+    def forward(self, graph_feat, batch):
+        graph_feat = self.mlp(graph_feat)
+        edge_attr = self.edge_unpooler(graph_feat, batch)
+        return batch.x, batch.edge_index, edge_attr, batch
+    
 class NodeEdgeUnpooler(nn.Module):
     def __init__(self):
         super(NodeEdgeUnpooler, self).__init__()
@@ -133,8 +155,9 @@ class ModelDecoder(nn.Module):
     def __init__(self):
         super(ModelDecoder, self).__init__()
 
-        self.unpooling = NodeEdgeUnpooler()
-        self.mpnn = EdgeMPNN(64, 64, 76, 64, 64, 3, dropout=0.2)
+        #self.unpooling = NodeEdgeUnpooler()
+        self.unpooling = EdgeUnpoolerOperation()
+        self.mpnn = EdgeMPNN(3, 64, 76, 64, 64, 3, dropout=0.2) #EdgeMPNN(64, 64, 76, 64, 64, 3, dropout=0.2)
         self.decoder = NodeEdgeFeatDecoder(64)
         
     def forward(self, graph_encoding, batch):
