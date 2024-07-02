@@ -229,11 +229,11 @@ class Learner(pl.LightningModule):
 
         self.log('val_mse_model', mse_model, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
-
-        
-
-        performances = test_on_mnist(model_reco, model_orig, f)
-
+        accuracies = test_on_mnist(model_reco, model_orig, f, reco_model_fromtext=model_reco_text if self.alignment else None)
+        self.log('orig_acc_mnist', accuracies[0], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+        self.log('reco_frommodel_acc_mnist', accuracies[1], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+        if self.alignment:
+            self.log('reco_fromtext_acc_mnist', accuracies[2], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         # select only indices of the list f that contain "CNN2"

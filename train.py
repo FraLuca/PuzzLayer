@@ -92,7 +92,7 @@ def main():
         num_nodes=1,
         logger=logger,
         #callbacks=callbacks,
-        check_val_every_n_epoch=1,
+        check_val_every_n_epoch=10,
         # val_check_interval=500,
         precision=16,
         # detect_anomaly=True,
