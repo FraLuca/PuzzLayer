@@ -2,10 +2,13 @@ import math
 import torch
 import torch.nn as nn
 from core.model.utils.graph_construct.constants import NODE_TYPES, EDGE_TYPES
+from core.configs import cfg
 
 class NodeEdgeFeatEncoder(nn.Module):
     def __init__(self, hidden_dim, norms=False, post_activation=True, ff=False, ff_scale=3, use_conv=True):
         super().__init__()
+
+        self.only_first = cfg.MODEL.ONLY_FIRST_PARAM
 
         self.norms = norms
         self.post_activation = post_activation

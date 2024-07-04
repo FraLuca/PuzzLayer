@@ -153,7 +153,8 @@ class ModelDataset(torch.utils.data.Dataset):
             text = sequential_text + dataset_text + ' ' + classes
         else:
             text = data
-
+            
+        sequential = data
         # text = self.couples_to_onehot[text]
         sequential = data
 
