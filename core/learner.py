@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 from core.model.build import build_model, init_model
 from core.model.model_encoder import ModelEncoder
 from core.model.text_encoder import TextEncoder, TextEncoderCustom
-from core.model.model_decoder import ModelDecoder
+from core.model.model_decoder import ModelDecoder, SimplerModelDecoder
 from core.dataset.build import build_dataset, custom_collate_fn
 from core.model.utils.loss import CLIPLoss
 from core.configs import cfg
@@ -16,6 +16,8 @@ from transformers import BertTokenizer, get_linear_schedule_with_warmup, BertMod
 from torch.optim.lr_scheduler import LinearLR
 from sklearn.metrics import accuracy_score
 from torch_geometric.data import Data, Batch
+from core.model.model_encoder import GraphUNetEncoder
+from core.model.utils.graph_utils.encoders import NodeEdgeFeatEncoder
 
 from core.utils.model_testing import *
 
@@ -27,12 +29,14 @@ class Learner(pl.LightningModule):
         self.cfg = cfg
         self.alignment = cfg.MODEL.ALIGNMENT
         output_dim = cfg.MODEL.OUTPUT_DIM_HEAD if cfg.MODEL.MAKE_MODEL_ENCODER_HEAD else cfg.MODEL.OUTPUT_DIM
-        self.model_encoder = ModelEncoder()
+        # self.model_encoder = ModelEncoder()
+        self.embedder = NodeEdgeFeatEncoder(16)
+        self.model_encoder = GraphUNetEncoder(16, 32, 16, 3, 16, 16, 0.5)
         # put requres_grad to False
         #for param in self.model_encoder.parameters():
         #    param.requires_grad = False
 
-        self.model_decoder = ModelDecoder()
+        self.model_decoder = SimplerModelDecoder()
         #self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         #self.bert_model = BertModel.from_pretrained("bert-base-uncased")
         #self.sentences_encoder = SentenceTransformer('bert-base-uncased')
@@ -80,7 +84,11 @@ class Learner(pl.LightningModule):
 
 
     def forward(self, model_batch, text_batch, f=None):
-        model_embed = self.model_encoder(model_batch, f)
+        encoded_x, encoded_edge = self.embedder(model_batch.x, model_batch.edge_attr)
+
+        # model_embed = self.model_encoder(model_batch, f)
+        # model_embed = self.model_encoder(encoded_x, model_batch.edge_index, encoded_edge, model_batch.batch)
+        x, edge_weights = self.model_encoder(encoded_x, model_batch.edge_index, encoded_edge, model_batch.batch)
         if self.alignment:
             text_embed = self.text_encoder(text_batch).squeeze(0)
             model_decoded_fromText = self.model_decoder(text_embed, model_batch)
@@ -105,14 +113,20 @@ class Learner(pl.LightningModule):
         # model_embed = self(model_batch, text_batch, f)
         # class_logits = self.classifier(model_embed)
 
+        # model_batch_fromModel = model_batch.clone()
+        # model_batch_fromModel.x = model_decoded_fromModel[0]
+        # model_batch_fromModel.edge_attr = model_decoded_fromModel[1]
+
         model_batch_fromModel = model_batch.clone()
-        model_batch_fromModel.x = model_decoded_fromModel[0]
-        model_batch_fromModel.edge_attr = model_decoded_fromModel[1]
+        model_batch_fromModel.x = model_batch.x
+        model_batch_fromModel.edge_attr[:, 0] = model_decoded_fromModel
+
+
         # RECO LOSSES
         # 1. smoothl1loss reco model from model - model gt
-        node_reco_model = self.NodeRecoModelLoss(model_decoded_fromModel[0], model_batch.x)
-        edge_reco_model = self.EdgeRecoModelLoss(model_decoded_fromModel[1], model_batch.edge_attr)
-        reco_loss = node_reco_model + edge_reco_model
+        # node_reco_model = self.NodeRecoModelLoss(model_decoded_fromModel[0], model_batch.x)
+        edge_reco_model = self.EdgeRecoModelLoss(model_decoded_fromModel, model_batch.edge_attr[:, 0])
+        reco_loss = edge_reco_model
 
         if self.alignment:
             model_batch_fromText = model_batch.clone()
@@ -135,7 +149,7 @@ class Learner(pl.LightningModule):
         
         
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('node_reco_model', node_reco_model, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        # self.log('node_reco_model', node_reco_model, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('edge_reco_model', edge_reco_model, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('reco_loss', reco_loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
@@ -165,14 +179,18 @@ class Learner(pl.LightningModule):
         # model_embed = self(model_batch, text_batch, f)
         # class_logits = self.classifier(model_embed)
         
+        # model_batch_fromModel = model_batch.clone()
+        # model_batch_fromModel.x = model_decoded_fromModel[0]
+        # model_batch_fromModel.edge_attr = model_decoded_fromModel[1]
+        
         model_batch_fromModel = model_batch.clone()
-        model_batch_fromModel.x = model_decoded_fromModel[0]
-        model_batch_fromModel.edge_attr = model_decoded_fromModel[1]
+        model_batch_fromModel.x = model_batch.x
+        model_batch_fromModel.edge_attr[:, 0] = model_decoded_fromModel
         # RECO LOSSES
         # 1. smoothl1loss reco model from model - model gt
-        node_reco_model = self.NodeRecoModelLoss(model_decoded_fromModel[0], model_batch.x)
-        edge_reco_model = self.EdgeRecoModelLoss(model_decoded_fromModel[1], model_batch.edge_attr)
-        reco_loss = node_reco_model + edge_reco_model
+        # node_reco_model = self.NodeRecoModelLoss(model_decoded_fromModel[0], model_batch.x)
+        edge_reco_model = self.EdgeRecoModelLoss(model_decoded_fromModel, model_batch.edge_attr[:, 0])
+        reco_loss = edge_reco_model
 
         if self.alignment:
             model_batch_fromText = model_batch.clone()
@@ -229,7 +247,7 @@ class Learner(pl.LightningModule):
 
         self.log('val_mse_model', mse_model, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        accuracies = test_on_mnist(model_reco, model_orig, f, reco_model_fromtext=model_reco_text if self.alignment else None)
+        accuracies = test_on_mnist(model_reco[:5], model_orig[:5], f[:5], reco_model_fromtext=model_reco_text[:5] if self.alignment else None)
         self.log('orig_acc_mnist', accuracies[0], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
         self.log('reco_frommodel_acc_mnist', accuracies[1], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
         if self.alignment:

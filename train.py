@@ -87,7 +87,7 @@ def main():
         log_every_n_steps=50,
         #accumulate_grad_batches=8,
         sync_batchnorm=True,
-        strategy="ddp_find_unused_parameters_true", # ddp_find_unused_parameters_true
+        # strategy="ddp_find_unused_parameters_true", # ddp_find_unused_parameters_true
         # plugins=DDPPlugin(find_unused_parameters=True),
         num_nodes=1,
         logger=logger,
