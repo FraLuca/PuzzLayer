@@ -154,7 +154,6 @@ class ModelDataset(torch.utils.data.Dataset):
         else:
             text = data
             
-        sequential = data
         # text = self.couples_to_onehot[text]
         sequential = data
 
