@@ -23,8 +23,8 @@ class Learner(pl.LightningModule):
         self.model_encoder = ModelEncoder()
 
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        vocab_size = self.tokenizer.vocab_size
-        self.text_encoder = TextEncoder(vocab_size)
+        # vocab_size = self.tokenizer.vocab_size
+        # self.text_encoder = TextEncoder(vocab_size)
 
         # self.criterion = CLIPLoss()
         self.criterion = nn.CrossEntropyLoss()
@@ -132,7 +132,7 @@ class Learner(pl.LightningModule):
             batch_size=self.cfg.SOLVER.BATCH_SIZE_VAL,
             shuffle=False,
             num_workers=self.cfg.SOLVER.NUM_WORKERS,
-            pin_memory=True,
+            pin_memory=False,
             persistent_workers=True,
             collate_fn=custom_collate_fn,
             )

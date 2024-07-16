@@ -1,3 +1,4 @@
+from core.model.utils.graph_utils.graph_models import EdgeMPNNGradualPooling, LineGraphMPNN
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,7 +16,10 @@ class GNNwEdgeReadout(nn.Module):
         self.use_nodes = use_nodes
 
     def forward(self, x, edge_index, edge_attr, batch):
-        x, edge_attr = self.gnn(x, edge_index, edge_attr, None, batch)
+        if type(self.gnn) == EdgeMPNNGradualPooling or type(self.gnn) == LineGraphMPNN:
+            x, edge_attr, edge_index, batch = self.gnn(x, edge_index, edge_attr, batch)
+        else:
+            x, edge_attr = self.gnn(x, edge_index, edge_attr, None, batch)
         if self.use_nodes:
             graph_feat = self.readout(x, edge_index, edge_attr, batch)
         else:
@@ -95,6 +99,23 @@ class MLPEdgeReadout(nn.Module):
 
     def forward(self, edge_index, edge_attr, batch, **kwargs):
         graph_feat = self.pool(edge_index, edge_attr, batch)
+        return self.mlp(graph_feat)
+    
+# create class MLPNodeReadout, which is the same as MLPEdgeReadout, but pools over nodes instead of edges
+class MLPNodeReadout(nn.Module):
+    def __init__(self, in_dim, hidden_dim, out_dim, num_layers=2, reduce='mean'):
+        super().__init__()
+        self.pool = BasicNodePool(reduce)
+        layers = [nn.Linear(in_dim, hidden_dim)]
+        layers.append(nn.ReLU())
+        for _ in range(num_layers-2):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(hidden_dim, out_dim))
+        self.mlp = nn.Sequential(*layers)
+
+    def forward(self, x, edge_index, edge_attr, batch, **kwargs):
+        graph_feat = self.pool(x, batch)
         return self.mlp(graph_feat)
 
 class DSEdgeReadout(nn.Module):

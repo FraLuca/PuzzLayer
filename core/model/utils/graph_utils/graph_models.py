@@ -5,6 +5,20 @@ import torch.nn.functional as F
 from torch_geometric.nn import MetaLayer
 from torch_geometric.nn.pool import max_pool_x, avg_pool_x, global_max_pool, global_mean_pool
 from torch_scatter import scatter
+from typing import Callable, List, Union
+
+import torch
+from torch import Tensor
+
+from torch_geometric.nn import TopKPooling
+from torch_geometric.nn.resolver import activation_resolver
+from torch_geometric.typing import OptTensor, PairTensor
+from torch_geometric.utils import (
+    add_self_loops,
+    remove_self_loops,
+    to_torch_csr_tensor,
+)
+from torch_geometric.utils.repeat import repeat
 
 class EdgeModel(nn.Module):
     def __init__(self, in_dim, out_dim, activation=True, use_global=False):
@@ -207,3 +221,104 @@ class EdgeMPNNDiT(nn.Module):
         edge_attr = self.final_layer(edge_attr)
         return x, edge_attr
 
+
+# now recreate the MPNN model but adding topk pooling after each layer
+class EdgeMPNNGradualPooling(nn.Module):
+    def __init__(self, node_in_dim, edge_in_dim, hidden_dim, node_out_dim, edge_out_dim, num_layers, use_bn=True, dropout=0.0, reduce='mean', pool_ratio=0.8):
+        super().__init__()
+        self.convs = nn.ModuleList()
+        self.node_norms = nn.ModuleList()
+        self.edge_norms = nn.ModuleList()
+        self.pools = nn.ModuleList()
+        self.use_bn = use_bn
+        self.dropout = dropout
+        self.reduce = reduce
+
+        if num_layers == 1:
+            edge_model = EdgeModel(edge_in_dim + 2*node_in_dim, edge_out_dim, activation=False)
+            self.convs.append(MetaLayer(edge_model=edge_model))
+        else:
+            edge_model = EdgeModel(edge_in_dim+node_in_dim*2, hidden_dim) 
+            node_model = NodeModel(node_in_dim+hidden_dim, hidden_dim, reduce=self.reduce)
+            #global_model = 
+            self.convs.append(MetaLayer(edge_model=edge_model, node_model=node_model))
+            self.node_norms.append(nn.BatchNorm1d(hidden_dim))
+            self.edge_norms.append(nn.BatchNorm1d(hidden_dim))
+            self.pools.append(TopKPooling(hidden_dim, pool_ratio))
+            for _ in range(num_layers-2):
+                edge_model = EdgeModel(3*hidden_dim, hidden_dim) 
+                node_model = NodeModel(2*hidden_dim, hidden_dim, reduce=self.reduce)
+                self.convs.append(MetaLayer(edge_model=edge_model, node_model=node_model))
+                self.node_norms.append(nn.BatchNorm1d(hidden_dim))
+                self.edge_norms.append(nn.BatchNorm1d(hidden_dim))
+                self.pools.append(TopKPooling(hidden_dim, pool_ratio))
+
+            edge_model = EdgeModel(3*hidden_dim, edge_out_dim, activation=False) 
+            node_model = NodeModel(hidden_dim+edge_out_dim, node_out_dim, activation=False, reduce=self.reduce)
+            self.convs.append(MetaLayer(edge_model=edge_model, node_model=node_model))
+
+    def forward(self, x, edge_index, edge_attr, batch, *args):
+        for i, conv in enumerate(self.convs):
+            x, edge_attr, _ = conv(x, edge_index, edge_attr)
+            if i != len(self.convs)-1 and self.use_bn:
+                x = self.node_norms[i](x)
+                edge_attr = self.edge_norms[i](edge_attr)
+                x, edge_index, edge_attr, batch, perm, _ = self.pools[i](x, edge_index, edge_attr, batch)
+                x = F.dropout(x, p=self.dropout, training=self.training)
+                edge_attr = F.dropout(edge_attr, p=self.dropout, training=self.training)
+        return x, edge_attr, edge_index, batch
+
+
+class LineGraphMPNN(nn.Module):
+    def __init__(self, node_in_dim, edge_in_dim, hidden_dim, node_out_dim, edge_out_dim, num_layers, use_bn=True, dropout=0.0, reduce='mean', pool_ratio=0.8):
+        super().__init__()
+        self.convs = nn.ModuleList()
+        self.post_convs = nn.ModuleList()
+        self.node_norms = nn.ModuleList()
+        self.edge_norms = nn.ModuleList()
+        self.pools = nn.ModuleList()
+        self.use_bn = use_bn
+        self.dropout = dropout
+        self.reduce = reduce
+
+        edge_model = EdgeModel(edge_in_dim+node_in_dim*2, hidden_dim)
+        node_model = NodeModel(node_in_dim+hidden_dim, hidden_dim, reduce=self.reduce)
+        self.convs.append(MetaLayer(edge_model=edge_model, node_model=node_model))
+        self.node_norms.append(nn.BatchNorm1d(hidden_dim))
+        self.edge_norms.append(nn.BatchNorm1d(hidden_dim))
+        edge_model = EdgeModel(3*hidden_dim, hidden_dim)
+        node_model = NodeModel(2*hidden_dim, hidden_dim, reduce=self.reduce)
+        self.post_convs.append(MetaLayer(edge_model=edge_model, node_model=node_model))
+        self.pools.append(TopKPooling(hidden_dim, pool_ratio))
+        for _ in range(num_layers-2):
+            edge_model = EdgeModel(3*hidden_dim, hidden_dim)
+            node_model = NodeModel(2*hidden_dim, hidden_dim, reduce=self.reduce)
+            self.convs.append(MetaLayer(edge_model=edge_model, node_model=node_model))
+            self.node_norms.append(nn.BatchNorm1d(hidden_dim))
+            self.edge_norms.append(nn.BatchNorm1d(hidden_dim))
+            edge_model = EdgeModel(3*hidden_dim, hidden_dim)
+            node_model = NodeModel(2*hidden_dim, hidden_dim, reduce=self.reduce)
+            self.post_convs.append(MetaLayer(edge_model=edge_model, node_model=node_model))
+            self.pools.append(TopKPooling(hidden_dim, pool_ratio))
+
+        edge_model = EdgeModel(3*hidden_dim, hidden_dim) 
+        node_model = NodeModel(2*hidden_dim, hidden_dim, reduce=self.reduce)
+        self.convs.append(MetaLayer(edge_model=edge_model, node_model=node_model))
+        self.node_norms.append(nn.BatchNorm1d(hidden_dim))
+        self.edge_norms.append(nn.BatchNorm1d(hidden_dim))
+        edge_model = EdgeModel(3*hidden_dim, edge_out_dim, activation=False) 
+        node_model = NodeModel(hidden_dim+edge_out_dim, node_out_dim, activation=False, reduce=self.reduce)
+        self.post_convs.append(MetaLayer(edge_model=edge_model, node_model=node_model))
+
+    def forward(self, x, edge_index, edge_attr, batch, *args):
+        for i, conv in enumerate(self.convs):
+            x, edge_attr, _ = conv(x, edge_index, edge_attr)
+            if self.use_bn:
+                x = self.node_norms[i](x)
+                edge_attr = self.edge_norms[i](edge_attr)
+                x = F.dropout(x, p=self.dropout, training=self.training)
+                edge_attr = F.dropout(edge_attr, p=self.dropout, training=self.training)
+            x, edge_attr, _ = self.post_convs[i](x, edge_index, edge_attr)
+            if i != len(self.convs)-1:
+                x, edge_index, edge_attr, batch, perm, _ = self.pools[i](x, edge_index, edge_attr, batch)
+        return x, edge_attr, edge_index, batch
