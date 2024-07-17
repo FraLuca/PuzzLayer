@@ -188,3 +188,4 @@ wandb/
 Dockerfile
 *.png
 *.ckpt
+data/MNIST/
