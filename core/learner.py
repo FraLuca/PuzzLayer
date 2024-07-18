@@ -93,7 +93,7 @@ class Learner(pl.LightningModule):
         return model_embed, text_embed
 
     def training_step(self, batch, batch_idx):
-        model_batch, text_batch, f = batch
+        model_batch, text_batch, f, sequential = batch
 
         # model_embed, text_embed = self(model_batch, text_batch, f)
         noise_set = self.train_diffusion_forward(batch)
@@ -106,12 +106,15 @@ class Learner(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        model_batch, text_batch, f = batch
+        model_batch, text_batch, f, sequential = batch
 
         generated = self.test_diffusion(batch)
         loss = self.criterion(generated.edge_attr[:,0:1], model_batch.edge_attr[:,0:1])
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+
+        # evaluate generated models on MNIST
+        
 
         # sim = self.compute_sim_matrix(model_embed, text_embed, f)
         # # acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
@@ -125,7 +128,7 @@ class Learner(pl.LightningModule):
         return loss
     
     def test_step(self, batch, batch_idx):
-        model_batch, text_batch, f = batch
+        model_batch, text_batch, f, sequential = batch
 
         text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:-1]
 
@@ -222,7 +225,7 @@ class Learner(pl.LightningModule):
     # diffusion things
 
     def train_diffusion_forward(self, batch):
-        model_batch, text_batch, f = batch
+        model_batch, text_batch, f, sequential = batch
 
         if self.do_classifier_free_guidance:
             # classifier free guidance: randomly drop text during training
@@ -305,7 +308,7 @@ class Learner(pl.LightningModule):
         return n_set
     
     def test_diffusion(self, batch):
-        model_batch, text_batch, f = batch
+        model_batch, text_batch, f, sequential = batch
 
         edge_batch = model_batch.batch[model_batch.edge_index[0]] # edge_batch will contain the graph index for each edge
 
@@ -335,7 +338,6 @@ class Learner(pl.LightningModule):
         else:
             text_emb = text_batch_embedded
         
-        # text encode
         with torch.no_grad():
             generated = self._diffusion_reverse(model_batch, text_emb)
 

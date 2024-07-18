@@ -81,17 +81,18 @@ class ModelDataset(torch.utils.data.Dataset):
 
         text = f.split('_')[0][-1] + ' ' + text
 
-        return g_data, text, f
+        return g_data, text, f, data
 
 
 def custom_collate_fn(batch):
     data_list = [d[0] for d in batch]
     text_list = [d[1] for d in batch]
     f_list = [d[2] for d in batch]
+    sequential_list = [d[3] for d in batch]
 
     # for data in data_list:
     #     for key, value in data:
     #         if torch.is_tensor(value):
     #             value.requires_grad_(False)
 
-    return Batch.from_data_list(data_list), text_list, f_list
+    return Batch.from_data_list(data_list), text_list, f_list, sequential_list
