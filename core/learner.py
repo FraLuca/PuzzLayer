@@ -1,14 +1,18 @@
+import inspect
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from core.model.build import build_model, init_model
-from core.model.model_encoder import ModelEncoder
+from core.model.denoiser import Denoiser
 from core.model.text_encoder import TextEncoder
 from core.dataset.build import build_dataset, custom_collate_fn
 from core.model.utils.loss import CLIPLoss
 from core.configs import cfg
+import numpy as np
+import diffusers
+from torch_geometric.data import Data, Batch
 
 from torch_geometric.data import Batch
 from transformers import BertTokenizer, get_linear_schedule_with_warmup
@@ -23,9 +27,34 @@ class Learner(pl.LightningModule):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        self.model_encoder = ModelEncoder(input_dim=cfg.MODEL.MODEL_INPUT_DIM,
-                                          output_dim=cfg.MODEL.MODEL_OUTPUT_DIM,
-                                          dropout=0.2)
+        self.do_classifier_free_guidance = True
+
+        # used at test time
+        self.ddim_scheduler = diffusers.DDIMScheduler(
+                num_train_timesteps= 1000,
+                beta_start= 0.00085,
+                beta_end= 0.012,
+                beta_schedule= 'scaled_linear', # Optional: ['linear', 'scaled_linear', 'squaredcos_cap_v2']
+                clip_sample= False,
+                set_alpha_to_one= False,
+                steps_offset= 1
+        )
+        self.ddim_scheduler.set_timesteps(50)
+        self.eta_ddim = 0.0
+        self.guidance_scale = 7.5
+        self.cfg_prob = 0.1
+        
+        # used at train time
+        self.ddpm_scheduler = diffusers.DDPMScheduler(
+                num_train_timesteps= 1000,
+                beta_start= 0.00085,
+                beta_end= 0.012,
+                beta_schedule= 'scaled_linear', # Optional: ['linear', 'scaled_linear', 'squaredcos_cap_v2']
+                variance_type= 'fixed_small',
+                clip_sample= False,
+        )
+
+        self.model_denoiser = Denoiser()
 
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         vocab_size = self.tokenizer.vocab_size
@@ -43,7 +72,7 @@ class Learner(pl.LightningModule):
                                                 projection_dim=cfg.MODEL.PROJ_OUTPUT_DIM,
                                                 dropout=cfg.MODEL.DROPOUT)
 
-        self.criterion = CLIPLoss()
+        self.criterion = nn.MSELoss()
 
         if cfg.PRETRAINED_MODEL_ENCODER:
             print(f"Loading pretrained model encoder from {cfg.PRETRAINED_MODEL_ENCODER}")
@@ -59,51 +88,39 @@ class Learner(pl.LightningModule):
 
 
     def forward(self, model_batch, text_batch, f=None):
-        model_embed = self.model_projection(self.model_encoder(model_batch, f))
+        # model_embed = self.model_projection(self.model_encoder(model_batch, f))
         text_embed = self.text_projection(self.text_encoder(text_batch))
         return model_embed, text_embed
 
     def training_step(self, batch, batch_idx):
         model_batch, text_batch, f = batch
 
-        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:-1]
+        # model_embed, text_embed = self(model_batch, text_batch, f)
+        noise_set = self.train_diffusion_forward(batch)
+        loss = self.criterion(noise_set["noise_pred"], noise_set["noise"])
+        # else:
+        #     loss += self.criterion(noise_set["noise_pred"], noise_set["orig"])
 
-        model_embed, text_embed = self(model_batch, text_batch, f)
-        
-        loss = self.criterion(model_embed, text_embed)
-        
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-
-        sim = self.compute_sim_matrix(model_embed, text_embed)
-        # acc = self.compute_accuracy_alignment(model_embed, text_embed)
-        # self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        
-        for k in [1, 3]:
-            recall_i2t, recall_t2i = recall_at_k(sim, k)
-            self.log(f"train_recall_i2t@{k}", recall_i2t, on_step=False, on_epoch=True, sync_dist=True)
-            self.log(f"train_recall_t2i@{k}", recall_t2i, on_step=False, on_epoch=True, sync_dist=True)
 
         return loss
 
     def validation_step(self, batch, batch_idx):
         model_batch, text_batch, f = batch
 
-        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:-1]
-
-        model_embed, text_embed = self(model_batch, text_batch, f)
-        
-        loss = self.criterion(model_embed, text_embed)
+        generated = self.test_diffusion(batch)
+        loss = self.criterion(generated.edge_attr[:,0:1], model_batch.edge_attr[:,0:1])
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        sim = self.compute_sim_matrix(model_embed, text_embed, f)
-        # acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
-        # self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        # sim = self.compute_sim_matrix(model_embed, text_embed, f)
+        # # acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
+        # # self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        for k in [1, 3]:
-            recall_i2t, recall_t2i = recall_at_k(sim, k)
-            self.log(f"val_recall_i2t@{k}", recall_i2t, on_step=False, on_epoch=True, sync_dist=True)
-            self.log(f"val_recall_t2i@{k}", recall_t2i, on_step=False, on_epoch=True, sync_dist=True)
+        # for k in [1, 3]:
+        #     recall_i2t, recall_t2i = recall_at_k(sim, k)
+        #     self.log(f"val_recall_i2t@{k}", recall_i2t, on_step=False, on_epoch=True, sync_dist=True)
+        #     self.log(f"val_recall_t2i@{k}", recall_t2i, on_step=False, on_epoch=True, sync_dist=True)
 
         return loss
     
@@ -187,7 +204,7 @@ class Learner(pl.LightningModule):
     def configure_optimizers(self):
         
         parameters = [
-            {"params": self.model_encoder.parameters(), "lr": self.cfg.SOLVER.MODEL_ENCODER_LR},
+            {"params": self.model_denoiser.parameters(), "lr": self.cfg.SOLVER.MODEL_ENCODER_LR},
             {"params": self.text_encoder.parameters(), "lr": self.cfg.SOLVER.TEXT_ENCODER_LR},
             {
                 "params": list(self.model_projection.parameters()) + list(self.text_projection.parameters()),
@@ -200,3 +217,195 @@ class Learner(pl.LightningModule):
         return {
             "optimizer": optimizer,
         }
+    
+    ###############################################################
+    # diffusion things
+
+    def train_diffusion_forward(self, batch):
+        model_batch, text_batch, f = batch
+
+        if self.do_classifier_free_guidance:
+            # classifier free guidance: randomly drop text during training
+            text_batch = [
+                "" if np.random.rand(1) < self.cfg_prob else i
+                for i in text_batch
+            ]
+
+        text = self.tokenizer(
+                text_batch,
+                padding="max_length",
+                truncation=True,
+                max_length=5,
+                return_tensors="pt",
+            ).to(model_batch.x.device).input_ids # TODO: remember that we are not removing the first and last token, and we are not using attention_masks
+        # text encode
+        text_emb = self.text_projection(self.text_encoder(text))
+
+        # diffusion process return with noise and noise_pred
+        n_set = self._diffusion_process(model_batch, text_emb)
+        return {**n_set}
+    
+    def _diffusion_process(self, models, text_emb, lengths=None):
+        """
+        heavily from https://github.com/huggingface/diffusers/blob/main/examples/dreambooth/train_dreambooth.py
+        """
+        # our latent   [batch_size, n_token=1 or 5 or 10, latent_dim=256]
+        # sd  latent   [batch_size, [n_token0=64,n_token1=64], latent_dim=4]
+        # [n_token, batch_size, latent_dim] -> [batch_size, n_token, latent_dim]
+        # latents = latents.permute(1, 0, 2)
+        
+        # orig_models = models.clone()
+
+        # Sample noise that we'll add to the latents
+        # [batch_size, n_token, latent_dim]
+        noise = torch.randn_like(models.edge_attr[:,0:1])
+
+        edge_batch = models.batch[models.edge_index[0]] # edge_batch will contain the graph index for each edge
+        
+        n_graphs = models.batch[-1] + 1
+        # Sample a random timestep for each graph in the batch
+        timesteps = torch.randint(
+            0,
+            1000, #self.noise_scheduler.config.num_train_timesteps,
+            (n_graphs, ),
+            device=models.x.device,
+        )
+
+        # now repeat same timestep for all edges in the same graph
+        timesteps = timesteps[edge_batch]
+        # now repeat same text_emb for all edges in the same graph
+        text_emb = text_emb[edge_batch]
+
+        timesteps = timesteps.long()
+        # Add noise to the latents according to the noise magnitude at each timestep
+        noisy_edge_attr = self.ddpm_scheduler.add_noise(models.edge_attr[:,0:1].clone(), noise, timesteps)
+
+        # put back noised weights inside batch
+        models.edge_attr[:,0:1] = noisy_edge_attr
+
+        # Predict the noise residual
+        noise_pred = self.model_denoiser(
+            sample=models,
+            timestep=timesteps,
+            text_emb=text_emb,
+            return_dict=False,
+        )[0]
+
+        noise_pred_prior = 0
+        noise_prior = 0
+        n_set = {
+            "noise": noise,
+            "noise_prior": noise_prior,
+            "noise_pred": noise_pred,
+            "noise_pred_prior": noise_pred_prior,
+        }
+        # if not self.predict_epsilon:
+        #     n_set["pred"] = noise_pred
+        #     n_set["orig"] = orig_models.edge_attr[:,0:1]
+        return n_set
+    
+    def test_diffusion(self, batch):
+        model_batch, text_batch, f = batch
+
+        edge_batch = model_batch.batch[model_batch.edge_index[0]] # edge_batch will contain the graph index for each edge
+
+        text_batch_tokenized = self.tokenizer(
+                text_batch,
+                padding="max_length",
+                truncation=True,
+                max_length=5,
+                return_tensors="pt",
+            ).to(model_batch.x.device).input_ids # TODO: remember that we are not removing the first and last token, and we are not using attention_masks
+        text_batch_embedded = self.text_projection(self.text_encoder(text_batch_tokenized))
+        text_batch_embedded = text_batch_embedded[edge_batch]
+
+        if self.do_classifier_free_guidance:
+            # cfg
+            uncond_tokens = [""] * len(text_batch)
+            uncond_tokens = self.tokenizer(
+                            uncond_tokens,
+                            padding="max_length",
+                            truncation=True,
+                            max_length=5,
+                            return_tensors="pt",
+                        ).to(model_batch.x.device).input_ids
+            uncond_tokens = self.text_projection(self.text_encoder(uncond_tokens))
+            uncond_tokens = uncond_tokens[edge_batch]
+            text_emb = torch.cat([uncond_tokens, text_batch_embedded], dim=0) # unconditioned first, then conditioned
+        else:
+            text_emb = text_batch_embedded
+        
+        # text encode
+        with torch.no_grad():
+            generated = self._diffusion_reverse(model_batch, text_emb)
+
+        return generated
+
+    def _diffusion_reverse(self, model_batch, text_emb):
+        # init latents
+        bsz = text_emb.shape[0] # corresponds to number of edges here
+        if self.do_classifier_free_guidance:
+            bsz = bsz // 2
+        
+        model_batch_orig = model_batch.clone()
+        
+        noised_weights = torch.randn(
+            (bsz, 1),
+            device=model_batch.edge_attr.device,
+            dtype=torch.float,
+        )
+
+        # scale the initial noise by the standard deviation required by the scheduler
+        noised_weights = noised_weights * self.ddim_scheduler.init_noise_sigma
+
+        # set timesteps
+        # self.ddim_scheduler.set_timesteps(50)
+        timesteps = self.ddim_scheduler.timesteps.to(model_batch.edge_attr.device)
+        # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
+        # eta (η) is only used with the DDIMScheduler, and between [0, 1]
+        extra_step_kwargs = {}
+        if "eta" in set(
+                inspect.signature(self.ddim_scheduler.step).parameters.keys()):
+            extra_step_kwargs["eta"] = self.eta_ddim
+
+        # reverse
+        for i, t in enumerate(timesteps):
+            # expand the input if we are doing classifier free guidance
+            model_batch_orig.edge_attr[:,0:1] = noised_weights
+            if self.do_classifier_free_guidance:
+                # replicate model_batch two times
+                model_batch = Batch.from_data_list([model_batch_orig, model_batch_orig])
+            else:
+                model_batch = model_batch_orig
+            
+            # now repeat same timestep for all edges in the same graph
+            t_batched = t.expand(model_batch.edge_attr.shape[0])
+            
+            # latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+            # predict the noise residual
+            noise_pred = self.model_denoiser(
+                sample=model_batch,
+                timestep=t_batched,
+                text_emb=text_emb,
+            )[0]
+            # perform guidance
+            if self.do_classifier_free_guidance:
+                noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                noise_pred = noise_pred_uncond + self.guidance_scale * (
+                    noise_pred_text - noise_pred_uncond)
+
+            noised_weights = self.ddim_scheduler.step(noise_pred, t, noised_weights,
+                                              **extra_step_kwargs).prev_sample
+            # if self.predict_epsilon:
+            #     latents = self.scheduler.step(noise_pred, t, latents,
+            #                                   **extra_step_kwargs).prev_sample
+            # else:
+            #     # predict x for standard diffusion model
+            #     # compute the previous noisy sample x_t -> x_t-1
+            #     latents = self.scheduler.step(noise_pred,
+            #                                   t,
+            #                                   latents,
+            #                                   **extra_step_kwargs).prev_sample
+
+        model_batch_orig.edge_attr[:,0:1] = noised_weights
+        return model_batch_orig

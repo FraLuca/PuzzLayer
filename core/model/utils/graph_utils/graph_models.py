@@ -101,12 +101,15 @@ class EdgeMPNN(nn.Module):
 
     def forward(self, x, edge_index, edge_attr, *args):
         for i, conv in enumerate(self.convs):
+            x_res, edge_attr_res = x.clone(), edge_attr.clone()
             x, edge_attr, _ = conv(x, edge_index, edge_attr)
             if i != len(self.convs)-1 and self.use_bn:
                 x = self.node_norms[i](x)
                 edge_attr = self.edge_norms[i](edge_attr)
                 x = F.dropout(x, p=self.dropout, training=self.training)
                 edge_attr = F.dropout(edge_attr, p=self.dropout, training=self.training)
+                x = x + x_res
+                edge_attr = edge_attr + edge_attr_res
         return x, edge_attr
 
 class ResEdgeMPNNBlock(nn.Module):

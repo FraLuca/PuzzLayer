@@ -15,3 +15,5 @@ setproctitle
 wandb
 transformers
 torch_geometric
+diffusers
+debugpy
