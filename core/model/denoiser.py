@@ -22,7 +22,7 @@ class Denoiser(nn.Module):
         self.encoder = NodeEdgeFeatEncoder(hidden_dim=cfg.MODEL.MODEL_INPUT_DIM)
         self.mpnn = EdgeMPNN(node_in_dim=cfg.MODEL.MODEL_INPUT_DIM,
                         edge_in_dim=cfg.MODEL.MODEL_INPUT_DIM,
-                        hidden_dim=76,
+                        hidden_dim=64,
                         node_out_dim=64,
                         edge_out_dim=64,
                         num_layers=5,

@@ -21,6 +21,7 @@ from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
 from core.model.utils.metrics import *
 from core.model.head import ProjectionHead
+from core.utils.model_testing import *
 
 
 class Learner(pl.LightningModule):
@@ -114,7 +115,11 @@ class Learner(pl.LightningModule):
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         # evaluate generated models on MNIST
-        
+        new_sequential = create_sequentials_from_graphs(generated, sequential)
+        avg_reco_acc, avg_orig_acc = test_on_mnist(new_sequential, sequential, f, limit_to_first=15)
+
+        self.log('avg_reco_acc', avg_reco_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('avg_orig_acc', avg_orig_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         # sim = self.compute_sim_matrix(model_embed, text_embed, f)
         # # acc = self.compute_accuracy_alignment(model_embed, text_embed, f)

@@ -69,9 +69,9 @@ def main():
     # create a checkpoint callback
     checkpoint_callback = ModelCheckpoint(
         dirpath=cfg.SAVE_DIR,
-        filename='_{val_recall_t2i@1:.3f}',
+        filename='_{avg_reco_acc:.3f}',
         save_top_k=1,
-        monitor='val_recall_t2i@1',
+        monitor='avg_reco_acc',
         mode='max',
     )
     periodic_checkpoint = PeriodicCheckpoint(cfg.SAVE_DIR, cfg.SAVE_CHECK_EVERY)
