@@ -114,13 +114,6 @@ class Learner(pl.LightningModule):
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        # evaluate generated models on MNIST
-        new_sequential = create_sequentials_from_graphs(generated, sequential)
-        avg_reco_acc, avg_orig_acc = test_on_mnist(new_sequential, sequential, f, limit_to_first=15)
-
-        self.log('avg_reco_acc', avg_reco_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('avg_orig_acc', avg_orig_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-
         # sim = self.compute_sim_matrix(model_embed, text_embed, f)
         # # acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
         # # self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
@@ -135,22 +128,26 @@ class Learner(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         model_batch, text_batch, f, sequential = batch
 
-        text_batch = torch.tensor([self.tokenizer.encode(t) for t in text_batch]).to(model_batch.x.device)[:, 1:-1]
-
-        model_embed, text_embed = self(model_batch, text_batch, f)
-        
-        loss = self.criterion(model_embed, text_embed)
+        generated = self.test_diffusion(batch)
+        loss = self.criterion(generated.edge_attr[:,0:1], model_batch.edge_attr[:,0:1])
 
         self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        sim = self.compute_sim_matrix(model_embed, text_embed, f)
-        # acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
-        # self.log('test_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        # evaluate generated models on MNIST
+        new_sequential = create_sequentials_from_graphs(generated, sequential)
+        avg_reco_acc, avg_orig_acc = test_on_mnist(new_sequential, sequential, f)
 
-        for k in [1, 3]:
-            recall_i2t, recall_t2i = recall_at_k(sim, k)
-            self.log(f"test_recall_i2t@{k}", recall_i2t, on_step=False, on_epoch=True, sync_dist=True)
-            self.log(f"test_recall_t2i@{k}", recall_t2i, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('test_reco_acc', avg_reco_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('test_orig_acc', avg_orig_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+
+        # sim = self.compute_sim_matrix(model_embed, text_embed, f)
+        # # acc = self.compute_accuracy_alignment(model_embed, text_embed, f)
+        # # self.log('test_acc', acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+
+        # for k in [1, 3]:
+        #     recall_i2t, recall_t2i = recall_at_k(sim, k)
+        #     self.log(f"test_recall_i2t@{k}", recall_i2t, on_step=False, on_epoch=True, sync_dist=True)
+        #     self.log(f"test_recall_t2i@{k}", recall_t2i, on_step=False, on_epoch=True, sync_dist=True)
 
         return loss
 

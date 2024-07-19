@@ -69,14 +69,14 @@ def main():
     # create a checkpoint callback
     checkpoint_callback = ModelCheckpoint(
         dirpath=cfg.SAVE_DIR,
-        filename='_{avg_reco_acc:.3f}',
+        filename='_{val_loss:.3f}',
         save_top_k=1,
-        monitor='avg_reco_acc',
-        mode='max',
+        monitor='val_loss',
+        mode='min',
     )
     periodic_checkpoint = PeriodicCheckpoint(cfg.SAVE_DIR, cfg.SAVE_CHECK_EVERY)
 
-    callbacks = [checkpoint_callback]
+    callbacks = [checkpoint_callback, periodic_checkpoint]
 
     # create a trainer
     trainer = pl.Trainer(
@@ -94,7 +94,7 @@ def main():
         callbacks=callbacks,
         check_val_every_n_epoch=10,
         # val_check_interval=500,
-        precision=16,
+        precision=32,
         # detect_anomaly=True,
     )
 

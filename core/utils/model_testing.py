@@ -3,6 +3,7 @@ import torch
 import os
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
+from tqdm import tqdm
 
 
 
@@ -37,7 +38,7 @@ def test_on_mnist(reco_model, orig_model, filenames, limit_to_first=0):
     orig_accuracies_sum = 0
     reco_accuracies_sum = 0
 
-    for i in range(limit_to_first):
+    for i in tqdm(range(limit_to_first)):
         orig_model[i].eval()
         reco_model[i].eval()
 
