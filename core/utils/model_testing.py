@@ -19,7 +19,7 @@ def create_sequentials_from_graphs(graphs, original_sequentials):
     return all_models
 
 
-def test_on_mnist(reco_model, orig_model, filenames, limit_to_first=0):
+def test_on_mnist(reco_model, orig_model, filenames, limit_to_first=0, print_each_acc=False):
 
     # load MNIST dataset
     mnist_test = datasets.MNIST('data',
@@ -51,16 +51,27 @@ def test_on_mnist(reco_model, orig_model, filenames, limit_to_first=0):
 
         orig_correct = 0
         reco_correct = 0
+        dictionary = {}
 
         for data, target in test_loader:
             data, target = data.to(device), target.to(device) # data.half().to(device), target.to(device)
             output = orig_model[i](data)
             orig_correct += output.argmax(dim=1).eq(target).sum().item()
             output = reco_model[i](data)
+            if print_each_acc:
+                # count how many times each value in output.argmax(dim=1) appears
+                for val in output.argmax(dim=1).tolist():
+                    if val in dictionary:
+                        dictionary[val] += 1
+                    else:
+                        dictionary[val] = 1
+
             reco_correct += output.argmax(dim=1).eq(target).sum().item()
         
         orig_accuracies_sum += orig_correct/len(mnist_subset)
         reco_accuracies_sum += reco_correct/len(mnist_subset)
+        if print_each_acc:
+            print(f"  model: {filenames[i]}, orig_acc: {round(orig_correct/len(mnist_subset), 3)}, reco_acc: {round(reco_correct/len(mnist_subset), 3)}, dict: {dictionary}")
 
     avg_orig_accuracy = orig_accuracies_sum / limit_to_first
     avg_reco_accuracy = reco_accuracies_sum / limit_to_first
