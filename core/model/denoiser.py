@@ -49,6 +49,7 @@ class Denoiser(nn.Module):
                 sample,
                 timestep,
                 text_emb,
+                layer_limits,
                 **kwargs):
 
         # 1. time_embedding
@@ -61,6 +62,12 @@ class Denoiser(nn.Module):
 
         # 2. condition + time embedding
         conditioning = time_emb + text_emb
+        if cfg.MODEL.DIFFUSION_PER_LAYER:
+            # condition only the layers that we want to diffuse
+            zeros = torch.zeros_like(conditioning)
+            for start, end in layer_limits:
+                zeros[start:end+1,:] = conditioning[start:end+1,:]
+            conditioning = zeros
 
         # 3. encoder
         encoded_x, encoded_edge = self.encoder(sample.x, sample.edge_attr)

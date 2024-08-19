@@ -4,6 +4,9 @@ import torch.nn as nn
 from torchvision import transforms
 from torchvision.datasets import MNIST #, CIFAR10, CIFAR100, ImageFolder, ImageNet
 from torch_geometric.data import Data, Batch
+from core.configs import cfg
+import itertools
+import copy
 
 from core.model.utils.graph_construct.model_arch_graph import sequential_to_arch, arch_to_graph, partial_reverse_tomodel # , graph_to_arch, arch_to_sequential
 
@@ -75,24 +78,51 @@ class ModelDataset(torch.utils.data.Dataset):
         x, edge_index, edge_attr = arch_to_graph(arch)
         g_data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
 
-        text = f.split('_')[2]
-        text = text[1:-1] # remove from text "[", "]"
-        text = text.replace(",", " ") # substitute "," with " "
+        couples = f.split('_')[2]
+        couples = couples[1:-1] # remove from text "[", "]"
+        couples = couples.replace(",", " ") # substitute "," with " "
+        if cfg.MODEL.DIFFUSION_PER_LAYER:
+            text = []
+            num_layers = int(f[3])+1
+            for i in range(1,num_layers+1):
+                text.append(f"{i} {num_layers} " + couples)
+        else:
+            text = f.split('_')[0][-1] + ' ' + couples
 
-        text = f.split('_')[0][-1] + ' ' + text
-
-        return g_data, text, f, data
+        if cfg.MODEL.DIFFUSION_PER_LAYER:
+            return [copy.deepcopy(g_data) for _ in range(num_layers)], text, [f]*num_layers, [copy.deepcopy(data) for _ in range(num_layers)]
+        else:
+            return g_data, text, f, data
 
 
 def custom_collate_fn(batch):
+    # personal note: remember that the shuffling is applied before data is passed to the collate_fn
     data_list = [d[0] for d in batch]
     text_list = [d[1] for d in batch]
     f_list = [d[2] for d in batch]
     sequential_list = [d[3] for d in batch]
+    layer_limits = None
 
-    # for data in data_list:
-    #     for key, value in data:
-    #         if torch.is_tensor(value):
-    #             value.requires_grad_(False)
+    if cfg.MODEL.DIFFUSION_PER_LAYER:
+        # merge all the lists of lists in single lists
+        data_list = list(itertools.chain.from_iterable(data_list))
+        text_list = list(itertools.chain.from_iterable(text_list))
+        f_list = list(itertools.chain.from_iterable(f_list))
+        sequential_list = list(itertools.chain.from_iterable(sequential_list))
 
-    return Batch.from_data_list(data_list), text_list, f_list, sequential_list
+        layer_limits = []
+        start_layer = 0
+        for i in range(len(text_list)):
+            layer_wanted = int(text_list[i][0]) # example text is "1 3 0 2"
+            layer_num = 0
+            for layer in sequential_list[i]:
+                if not hasattr(layer, "weight"):
+                    continue
+                layer_num += 1
+                num_params = torch.numel(layer.weight) + torch.numel(layer.bias)
+                if layer_num == layer_wanted:
+                    layer_limits.append([start_layer, start_layer+num_params-1])
+                start_layer += num_params
+        assert len(text_list) == len(layer_limits)
+    
+    return Batch.from_data_list(data_list), text_list, f_list, sequential_list, layer_limits

@@ -189,3 +189,4 @@ Dockerfile
 *.png
 *.ckpt
 data/MNIST/
+generate_nets/
