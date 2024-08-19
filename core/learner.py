@@ -98,7 +98,13 @@ class Learner(pl.LightningModule):
 
         # model_embed, text_embed = self(model_batch, text_batch, f)
         noise_set = self.train_diffusion_forward(batch)
-        loss = self.criterion(noise_set["noise_pred"], noise_set["noise"])
+        if cfg.MODEL.DIFFUSION_PER_LAYER:
+            noise_pred = noise_set["noise_pred"][layers_mask == 1]
+            noise = noise_set["noise"][layers_mask == 1]
+        else:
+            noise_pred = noise_set["noise_pred"]
+            noise = noise_set["noise"]
+        loss = self.criterion(noise_pred, noise)
         # else:
         #     loss += self.criterion(noise_set["noise_pred"], noise_set["orig"])
 
@@ -110,7 +116,13 @@ class Learner(pl.LightningModule):
         model_batch, text_batch, f, sequential, layers_mask = batch
 
         generated = self.test_diffusion(batch)
-        loss = self.criterion(generated.edge_attr[:,0:1], model_batch.edge_attr[:,0:1])
+        if cfg.MODEL.DIFFUSION_PER_LAYER:
+            generated_weights = generated.edge_attr[:,0:1][layers_mask == 1]
+            original_weights = model_batch.edge_attr[:,0:1][layers_mask == 1]
+        else:
+            generated_weights = generated.edge_attr[:,0:1]
+            original_weights = model_batch.edge_attr[:,0:1]
+        loss = self.criterion(generated_weights, original_weights)
 
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
@@ -129,7 +141,13 @@ class Learner(pl.LightningModule):
         model_batch, text_batch, f, sequential, layers_mask = batch
 
         generated = self.test_diffusion(batch)
-        loss = self.criterion(generated.edge_attr[:,0:1], model_batch.edge_attr[:,0:1])
+        if cfg.MODEL.DIFFUSION_PER_LAYER:
+            generated_weights = generated.edge_attr[:,0:1][layers_mask == 1]
+            original_weights = model_batch.edge_attr[:,0:1][layers_mask == 1]
+        else:
+            generated_weights = generated.edge_attr[:,0:1]
+            original_weights = model_batch.edge_attr[:,0:1]
+        loss = self.criterion(generated_weights, original_weights)
 
         self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
