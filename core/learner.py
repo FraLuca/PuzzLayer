@@ -185,7 +185,7 @@ class Learner(pl.LightningModule):
             batch_size=self.cfg.SOLVER.BATCH_SIZE_VAL,
             shuffle=False,
             num_workers=self.cfg.SOLVER.NUM_WORKERS,
-            pin_memory=True,
+            pin_memory=False,
             persistent_workers=True,
             collate_fn=custom_collate_fn,
             )
@@ -407,7 +407,7 @@ class Learner(pl.LightningModule):
                 sample=model_batch,
                 timestep=t_batched,
                 text_emb=text_emb,
-                layer_limits=layers_mask_cfg if self.do_classifier_free_guidance else layers_mask,
+                layers_mask=layers_mask_cfg if self.do_classifier_free_guidance else layers_mask,
             )[0]
             # perform guidance
             if self.do_classifier_free_guidance:
