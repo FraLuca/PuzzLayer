@@ -7,6 +7,7 @@ from torch_geometric.data import Data, Batch
 from core.configs import cfg
 import itertools
 import copy
+import random
 
 from core.model.utils.graph_construct.model_arch_graph import sequential_to_arch, arch_to_graph, partial_reverse_tomodel # , graph_to_arch, arch_to_sequential
 
@@ -82,35 +83,27 @@ class ModelDataset(torch.utils.data.Dataset):
         couples = couples[1:-1] # remove from text "[", "]"
         couples = couples.replace(",", " ") # substitute "," with " "
         if cfg.MODEL.DIFFUSION_PER_LAYER:
-            text = []
             num_layers = int(f[3])+1
-            for i in range(1,num_layers+1):
-                text.append(f"{i} {num_layers} " + couples)
+            sampled_layer = random.randint(1, num_layers)
+            text = f"{sampled_layer} {num_layers} " + couples
         else:
             text = f.split('_')[0][-1] + ' ' + couples
 
-        if cfg.MODEL.DIFFUSION_PER_LAYER:
-            return [copy.deepcopy(g_data) for _ in range(num_layers)], text, [f]*num_layers, [copy.deepcopy(data) for _ in range(num_layers)]
-        else:
-            return g_data, text, f, data
+        return g_data, text, f, data
 
 
 def custom_collate_fn(batch):
     # personal note: remember that the shuffling is applied before data is passed to the collate_fn
     data_list = [d[0] for d in batch]
+    graphs_batch = Batch.from_data_list(data_list)
     text_list = [d[1] for d in batch]
     f_list = [d[2] for d in batch]
     sequential_list = [d[3] for d in batch]
-    layer_limits = None
+    layers_mask = None
 
     if cfg.MODEL.DIFFUSION_PER_LAYER:
-        # merge all the lists of lists in single lists
-        data_list = list(itertools.chain.from_iterable(data_list))
-        text_list = list(itertools.chain.from_iterable(text_list))
-        f_list = list(itertools.chain.from_iterable(f_list))
-        sequential_list = list(itertools.chain.from_iterable(sequential_list))
 
-        layer_limits = []
+        layers_mask = torch.zeros_like(graphs_batch.edge_attr[:,0:1])
         start_layer = 0
         for i in range(len(text_list)):
             layer_wanted = int(text_list[i][0]) # example text is "1 3 0 2"
@@ -121,8 +114,7 @@ def custom_collate_fn(batch):
                 layer_num += 1
                 num_params = torch.numel(layer.weight) + torch.numel(layer.bias)
                 if layer_num == layer_wanted:
-                    layer_limits.append([start_layer, start_layer+num_params-1])
+                    layers_mask[start_layer:start_layer+num_params,:] = 1
                 start_layer += num_params
-        assert len(text_list) == len(layer_limits)
     
-    return Batch.from_data_list(data_list), text_list, f_list, sequential_list, layer_limits
+    return graphs_batch, text_list, f_list, sequential_list, layers_mask

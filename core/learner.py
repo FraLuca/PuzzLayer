@@ -94,7 +94,7 @@ class Learner(pl.LightningModule):
         return model_embed, text_embed
 
     def training_step(self, batch, batch_idx):
-        model_batch, text_batch, f, sequential, layer_limits = batch
+        model_batch, text_batch, f, sequential, layers_mask = batch
 
         # model_embed, text_embed = self(model_batch, text_batch, f)
         noise_set = self.train_diffusion_forward(batch)
@@ -107,7 +107,7 @@ class Learner(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        model_batch, text_batch, f, sequential, layer_limits = batch
+        model_batch, text_batch, f, sequential, layers_mask = batch
 
         generated = self.test_diffusion(batch)
         loss = self.criterion(generated.edge_attr[:,0:1], model_batch.edge_attr[:,0:1])
@@ -126,7 +126,7 @@ class Learner(pl.LightningModule):
         return loss
     
     def test_step(self, batch, batch_idx):
-        model_batch, text_batch, f, sequential, layer_limits = batch
+        model_batch, text_batch, f, sequential, layers_mask = batch
 
         generated = self.test_diffusion(batch)
         loss = self.criterion(generated.edge_attr[:,0:1], model_batch.edge_attr[:,0:1])
@@ -227,7 +227,7 @@ class Learner(pl.LightningModule):
     # diffusion things
 
     def train_diffusion_forward(self, batch):
-        model_batch, text_batch, f, sequential, layer_limits = batch
+        model_batch, text_batch, f, sequential, layers_mask = batch
 
         if self.do_classifier_free_guidance:
             # classifier free guidance: randomly drop text during training
@@ -245,10 +245,10 @@ class Learner(pl.LightningModule):
         text_emb = self.text_projection(self.text_encoder(text))
 
         # diffusion process return with noise and noise_pred
-        n_set = self._diffusion_process(model_batch, text_emb, layer_limits)
+        n_set = self._diffusion_process(model_batch, text_emb, layers_mask)
         return {**n_set}
     
-    def _diffusion_process(self, models, text_emb, layer_limits, lengths=None):
+    def _diffusion_process(self, models, text_emb, layers_mask, lengths=None):
         """
         heavily from https://github.com/huggingface/diffusers/blob/main/examples/dreambooth/train_dreambooth.py
         """
@@ -263,11 +263,8 @@ class Learner(pl.LightningModule):
         # [batch_size, n_token, latent_dim]
         noise = torch.randn_like(models.edge_attr[:,0:1])
         if cfg.MODEL.DIFFUSION_PER_LAYER:
-            # fill the noise only for the layers that we want to diffuse
-            zeros = torch.zeros_like(noise)
-            for start, end in layer_limits:
-                zeros[start:end+1,:] = noise[start:end+1,:]
-            noise = zeros
+            # put non-zero noise only for the layers that we want to diffuse
+            noise = noise * layers_mask
 
         edge_batch = models.batch[models.edge_index[0]] # edge_batch will contain the graph index for each edge
         
@@ -292,8 +289,7 @@ class Learner(pl.LightningModule):
         # put back noised weights inside batch
         if cfg.MODEL.DIFFUSION_PER_LAYER:
             # fill the noised edge_attr only for the layers that we want to diffuse
-            for start, end in layer_limits:
-                models.edge_attr[start:end+1,0:1] = noisy_edge_attr[start:end+1,:]
+            models.edge_attr[:,0:1] = models.edge_attr[:,0:1] * (1 - layers_mask) + noisy_edge_attr * layers_mask
         else:
             models.edge_attr[:,0:1] = noisy_edge_attr
 
@@ -302,16 +298,13 @@ class Learner(pl.LightningModule):
             sample=models,
             timestep=timesteps,
             text_emb=text_emb,
-            layer_limits=layer_limits,
+            layers_mask=layers_mask,
             return_dict=False,
         )[0]
 
         if cfg.MODEL.DIFFUSION_PER_LAYER:
             # keep the noise_pred only for the layers that we diffused
-            zeros = torch.zeros_like(noise_pred)
-            for start, end in layer_limits:
-                zeros[start:end+1,:] = noise_pred[start:end+1,:]
-            noise_pred = zeros
+            noise_pred = noise_pred * layers_mask
 
         noise_pred_prior = 0
         noise_prior = 0
@@ -327,7 +320,7 @@ class Learner(pl.LightningModule):
         return n_set
     
     def test_diffusion(self, batch):
-        model_batch, text_batch, f, sequential, layer_limits = batch
+        model_batch, text_batch, f, sequential, layers_mask = batch
 
         edge_batch = model_batch.batch[model_batch.edge_index[0]] # edge_batch will contain the graph index for each edge
 
@@ -357,20 +350,19 @@ class Learner(pl.LightningModule):
             text_emb = text_batch_embedded
         
         with torch.no_grad():
-            generated = self._diffusion_reverse(model_batch, text_emb, layer_limits)
+            generated = self._diffusion_reverse(model_batch, text_emb, layers_mask)
 
         return generated
 
-    def _diffusion_reverse(self, model_batch, text_emb, layer_limits):
+    def _diffusion_reverse(self, model_batch, text_emb, layers_mask):
         # init latents
         bsz = text_emb.shape[0] # bsz will correspond to number of edges
         if self.do_classifier_free_guidance:
             bsz = bsz // 2
-            layer_limits_cfg = None
+            layers_mask_cfg = None
             if cfg.MODEL.DIFFUSION_PER_LAYER:
-                total_edges = model_batch.edge_attr.shape[0]
-                layer_limits_cfg = [[start + total_edges, end + total_edges] for start, end in layer_limits]
-                layer_limits_cfg = layer_limits + layer_limits_cfg
+                # concatenate the layers mask for the unconditioned and conditioned predictions
+                layers_mask_cfg = torch.cat([layers_mask, layers_mask], dim=0)
         
         model_batch_orig = model_batch.clone()
         
@@ -397,8 +389,7 @@ class Learner(pl.LightningModule):
         for i, t in enumerate(timesteps):
             if cfg.MODEL.DIFFUSION_PER_LAYER:
                 # fill the noised weights only for the layers that we want to diffuse
-                for start, end in layer_limits:
-                    model_batch_orig.edge_attr[start:end+1,0:1] = noised_weights[start:end+1,:]
+                model_batch_orig.edge_attr[:,0:1] = model_batch_orig.edge_attr[:,0:1] * (1 - layers_mask) + noised_weights * layers_mask
             else:
                 model_batch_orig.edge_attr[:,0:1] = noised_weights
             if self.do_classifier_free_guidance:
@@ -416,7 +407,7 @@ class Learner(pl.LightningModule):
                 sample=model_batch,
                 timestep=t_batched,
                 text_emb=text_emb,
-                layer_limits=layer_limits_cfg if self.do_classifier_free_guidance else layer_limits,
+                layer_limits=layers_mask_cfg if self.do_classifier_free_guidance else layers_mask,
             )[0]
             # perform guidance
             if self.do_classifier_free_guidance:
@@ -439,8 +430,7 @@ class Learner(pl.LightningModule):
         
         if cfg.MODEL.DIFFUSION_PER_LAYER:
             # fill the noised weights only for the layers that we want to diffuse
-            for start, end in layer_limits:
-                model_batch_orig.edge_attr[start:end+1,0:1] = noised_weights[start:end+1,:]
+            model_batch_orig.edge_attr[:,0:1] = model_batch_orig.edge_attr[:,0:1] * (1 - layers_mask) + noised_weights * layers_mask
         else:
             model_batch_orig.edge_attr[:,0:1] = noised_weights
         return model_batch_orig
