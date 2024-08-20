@@ -19,14 +19,17 @@ warnings.filterwarnings('ignore')
 # os.environ["NCCL_P2P_DISABLE"] = "1"
 
 class PeriodicCheckpoint(ModelCheckpoint):
-    def __init__(self, dirpath: str, every: int):
+    def __init__(self, dirpath: str, every: int, save_last_ckpt: bool):
         super().__init__()
         self.dirpath = dirpath
         self.every = every
+        self.save_last_ckpt = save_last_ckpt
 
     def on_train_epoch_end(
         self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs
     ):
+        if self.save_last_ckpt:
+            trainer.save_checkpoint(self.dirpath + "/last_epoch.ckpt")
         if (pl_module.current_epoch + 1) % self.every == 0:
             assert self.dirpath is not None
             self.filename = f"model_{pl_module.current_epoch}.ckpt"
@@ -64,19 +67,20 @@ def main():
             group=cfg.WANDB.GROUP,
             config=cfg,
             save_dir=".",
+            offline=cfg.WANDB.OFFLINE,
         )
 
     # create a checkpoint callback
-    checkpoint_callback = ModelCheckpoint(
+    best_checkpoint_callback = ModelCheckpoint(
         dirpath=cfg.SAVE_DIR,
         filename='_{val_loss:.3f}',
         save_top_k=1,
         monitor='val_loss',
         mode='min',
     )
-    periodic_checkpoint = PeriodicCheckpoint(cfg.SAVE_DIR, cfg.SAVE_CHECK_EVERY)
+    periodic_checkpoint = PeriodicCheckpoint(cfg.SAVE_DIR, cfg.SAVE_CHECK_EVERY, cfg.SAVE_LAST_CKPT)
 
-    callbacks = [checkpoint_callback, periodic_checkpoint]
+    callbacks = [best_checkpoint_callback, periodic_checkpoint]
 
     # create a trainer
     trainer = pl.Trainer(
