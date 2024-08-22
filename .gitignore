@@ -190,3 +190,8 @@ Dockerfile
 *.ckpt
 data/MNIST/
 generate_nets/
+diffusers/
+*.err
+*.out
+*.sh
+cineca_logs/
