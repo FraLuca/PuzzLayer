@@ -32,6 +32,7 @@ def test_on_mnist(reco_model, orig_model, filenames, limit_to_first=0, print_eac
                                         transforms.Normalize((0.1307,), (0.3081,))
                                     ])
                                 )
+    test_loader = DataLoader(mnist_test, batch_size=64, shuffle=False)
     
     if limit_to_first == 0:
         limit_to_first = len(reco_model)
@@ -42,13 +43,7 @@ def test_on_mnist(reco_model, orig_model, filenames, limit_to_first=0, print_eac
     for i in tqdm(range(limit_to_first)):
         orig_model[i].eval()
         reco_model[i].eval()
-
-        classes = filenames[i].split('_')[2]
         device = next(orig_model[i].parameters()).device
-
-        indices = [i for i, (_, label) in enumerate(mnist_test) if str(label) in classes]
-        mnist_subset = Subset(mnist_test, indices)
-        test_loader = DataLoader(mnist_subset, batch_size=64, shuffle=False)
 
         orig_correct = 0
         reco_correct = 0
@@ -69,10 +64,10 @@ def test_on_mnist(reco_model, orig_model, filenames, limit_to_first=0, print_eac
 
             reco_correct += output.argmax(dim=1).eq(target).sum().item()
         
-        orig_accuracies_sum += orig_correct/len(mnist_subset)
-        reco_accuracies_sum += reco_correct/len(mnist_subset)
+        orig_accuracies_sum += orig_correct/len(mnist_test)
+        reco_accuracies_sum += reco_correct/len(mnist_test)
         if print_each_acc:
-            print(f"  model: {filenames[i]}, orig_acc: {round(orig_correct/len(mnist_subset), 3)}, reco_acc: {round(reco_correct/len(mnist_subset), 3)}, dict: {dictionary}")
+            print(f"  model: {filenames[i]}, orig_acc: {round(orig_correct/len(mnist_test), 3)}, reco_acc: {round(reco_correct/len(mnist_subset), 3)}, dict: {dictionary}")
 
     avg_orig_accuracy = orig_accuracies_sum / limit_to_first
     avg_reco_accuracy = reco_accuracies_sum / limit_to_first

@@ -6,7 +6,6 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from core.model.build import build_model, init_model
 from core.model.denoiser import Denoiser
-from core.model.text_encoder import TextEncoder
 from core.dataset.build import build_dataset, custom_collate_fn
 from core.model.utils.loss import CLIPLoss
 from core.configs import cfg
@@ -15,7 +14,6 @@ import diffusers
 from torch_geometric.data import Data, Batch
 
 from torch_geometric.data import Batch
-from transformers import BertTokenizer, get_linear_schedule_with_warmup
 from torch.optim.lr_scheduler import LinearLR
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
@@ -57,17 +55,9 @@ class Learner(pl.LightningModule):
 
         self.model_denoiser = Denoiser()
 
-        self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        vocab_size = self.tokenizer.vocab_size
-        self.text_encoder = TextEncoder(vocab_size,
-                                        input_dim=cfg.MODEL.TEXT_INPUT_DIM,
-                                        num_heads=2,
-                                        num_layers=2,
-                                        dropout=cfg.MODEL.DROPOUT)
-
-        self.text_projection = ProjectionHead(embedding_dim=cfg.MODEL.TEXT_INPUT_DIM,
-                                              projection_dim=cfg.MODEL.PROJ_OUTPUT_DIM,
-                                              dropout=cfg.MODEL.DROPOUT)
+        self.text_projection = nn.Sequential(nn.Linear(1536, cfg.MODEL.PROJ_OUTPUT_DIM),
+                                            nn.ReLU(),
+                                            nn.Linear(cfg.MODEL.PROJ_OUTPUT_DIM, cfg.MODEL.PROJ_OUTPUT_DIM))
         
         self.model_projection = ProjectionHead(embedding_dim=cfg.MODEL.MODEL_OUTPUT_DIM,
                                                 projection_dim=cfg.MODEL.PROJ_OUTPUT_DIM,
@@ -78,7 +68,8 @@ class Learner(pl.LightningModule):
         if cfg.PRETRAINED_MODEL_ENCODER:
             print(f"Loading pretrained model encoder from {cfg.PRETRAINED_MODEL_ENCODER}")
             self.load_checkpoint(cfg.PRETRAINED_MODEL_ENCODER)
-
+        
+        self.empty_string = torch.tensor(torch.load("datasets/texts/empty_string.pt"))
         self.save_hyperparameters(cfg)
 
 
@@ -228,7 +219,6 @@ class Learner(pl.LightningModule):
         
         parameters = [
             {"params": self.model_denoiser.parameters(), "lr": self.cfg.SOLVER.MODEL_ENCODER_LR},
-            {"params": self.text_encoder.parameters(), "lr": self.cfg.SOLVER.TEXT_ENCODER_LR},
             {
                 "params": list(self.model_projection.parameters()) + list(self.text_projection.parameters()),
                 "lr": self.cfg.SOLVER.PROJ_LR,
@@ -249,18 +239,15 @@ class Learner(pl.LightningModule):
 
         if self.do_classifier_free_guidance:
             # classifier free guidance: randomly drop text during training
+            self.empty_string = self.empty_string.to(model_batch.edge_attr.device)
             text_batch = [
-                "" if np.random.rand(1) < self.cfg_prob else i
+                self.empty_string if np.random.rand(1) < self.cfg_prob else i
                 for i in text_batch
             ]
+            text_batch = torch.stack(text_batch)
 
-        text = self.tokenizer(
-                text_batch,
-                padding=True,
-                return_tensors="pt",
-            ).to(model_batch.x.device).input_ids # TODO: remember that we are not removing the first and last token, and we are not using attention_masks
         # text encode
-        text_emb = self.text_projection(self.text_encoder(text))
+        text_emb = self.text_projection(text_batch)
 
         # diffusion process return with noise and noise_pred
         n_set = self._diffusion_process(model_batch, text_emb, layers_mask)
@@ -342,26 +329,14 @@ class Learner(pl.LightningModule):
 
         edge_batch = model_batch.batch[model_batch.edge_index[0]] # edge_batch will contain the graph index for each edge
 
-        text_batch_tokenized = self.tokenizer(
-                text_batch,
-                padding=True,
-                return_tensors="pt",
-            ).to(model_batch.x.device).input_ids # TODO: remember that we are not removing the first and last token, and we are not using attention_masks
-        text_batch_embedded = self.text_projection(self.text_encoder(text_batch_tokenized))
+        text_batch_embedded = self.text_projection(text_batch)
         # now repeat same text_emb for all edges in the same graph
         text_batch_embedded = text_batch_embedded[edge_batch]
 
         if self.do_classifier_free_guidance:
             # cfg
-            uncond_tokens = [""] * len(text_batch)
-            uncond_tokens = self.tokenizer(
-                            uncond_tokens,
-                            padding="max_length",
-                            truncation=True,
-                            max_length=6 if cfg.MODEL.DIFFUSION_PER_LAYER else 5,
-                            return_tensors="pt",
-                        ).to(model_batch.x.device).input_ids
-            uncond_tokens = self.text_projection(self.text_encoder(uncond_tokens))
+            uncond_tokens = self.empty_string.repeat(len(text_batch), 1).to(model_batch.edge_attr.device)
+            uncond_tokens = self.text_projection(uncond_tokens)
             uncond_tokens = uncond_tokens[edge_batch]
             text_emb = torch.cat([uncond_tokens, text_batch_embedded], dim=0) # unconditioned first, then conditioned
         else:

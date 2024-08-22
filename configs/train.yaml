@@ -4,7 +4,7 @@ MODEL:
   MODEL_OUTPUT_DIM: 64
   PROJ_OUTPUT_DIM: 64
   DROPOUT: 0.1
-  DIFFUSION_PER_LAYER: True
+  DIFFUSION_PER_LAYER: False
 
 WANDB:
   ENABLE: False
@@ -14,22 +14,22 @@ WANDB:
   OFFLINE: False
 
 DATASETS:
-  TRAIN: "datasets/trainCNN/"   # mnist, cifar10, cifar100, imagenette, imagenet
-  TEST: "datasets/validCNN/"
+  TRAIN: "datasets/trainVAR/"   # mnist, cifar10, cifar100, imagenette, imagenet
+  TEST: "datasets/validVAR/"
 
 SOLVER:
- GPUS: [7]
+ GPUS: [2]
  NUM_WORKERS: 4
  MODEL_ENCODER_LR: 0.0005
  TEXT_ENCODER_LR: 0.0005
  PROJ_LR: 0.0005
- BATCH_SIZE: 64
+ BATCH_SIZE: 24
  EPOCHS: 30000
  WEIGHT_DECAY: 0. #0.0005
  BATCH_SIZE_VAL: 30
  
 
-NAME: "layerdiffusion_prova"
+NAME: "diffusion_prova"
 OUTPUT_DIR: "results/debug"
 PRETRAINED_MODEL_ENCODER: None #"results/debug/dgx lr 5e-4 no wd/_val_acc=0.830.ckpt"
 SAVE_CHECK_EVERY: 500

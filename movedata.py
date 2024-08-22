@@ -39,7 +39,7 @@ for key,value in dic.items():
             names_to_move[cnn_type] = []
         else:
             names_to_move[cnn_type].append(short_name)
-        shutil.move(path+current_sample, destination_path+current_sample)
+        # shutil.move(path+current_sample, destination_path+current_sample)
 
 print("NAMES TO MOVE")
 for key,value in names_to_move.items():
@@ -51,11 +51,11 @@ for item in os.listdir(path):
     short_name = item.split(".")[0][:-2]
     cnn_type = short_name.split('_')[0]
     if short_name in names_to_move[cnn_type]:
-        # if cnn_type not in duplicates:
-        #     duplicates[cnn_type] = []
-        # else:
-        #     duplicates[cnn_type].append(short_name)
-        shutil.move(path+item, not_used+item)
+        if cnn_type not in duplicates:
+            duplicates[cnn_type] = []
+        else:
+            duplicates[cnn_type].append(short_name)
+        # shutil.move(path+item, not_used+item)
 
 
 print("DUPLICATES")

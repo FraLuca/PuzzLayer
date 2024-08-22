@@ -30,6 +30,7 @@ class ModelDataset(torch.utils.data.Dataset):
         self.file_list = os.listdir(self.path)
         # self.max_num_ckpt = torch.load(self.path + self.file_list[0])['pdata'].shape[0]
         self.max_num_ckpt = 1
+        self.text_dict = torch.load("datasets/texts/var_text_embeddings.pt")
 
         # model = torch.load("mnist/NND_mnist_run1.pt", map_location='cpu')['model'].module
         self.model = {
@@ -63,14 +64,14 @@ class ModelDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
 
         f = self.file_list[idx]
-        rnd_ckpt_idx = torch.randint(0, self.max_num_ckpt, (1,)).item()
+        # rnd_ckpt_idx = torch.randint(0, self.max_num_ckpt, (1,)).item()
         modeltype = f[:4]
 
         if "MLP" in modeltype:
-            data = torch.load(self.path + f)['pdata'][rnd_ckpt_idx]        
+            data = torch.load(self.path + f)['pdata'][-1]        
             data = partial_reverse_tomodel(data, self.model[modeltype])
         elif "CNN" in modeltype:
-            data = torch.load(self.path + f, map_location="cpu")['pdata'][rnd_ckpt_idx]
+            data = torch.load(self.path + f, map_location="cpu")['pdata'][-1]
         
         for param in data.parameters():
             param.requires_grad = False
@@ -79,15 +80,12 @@ class ModelDataset(torch.utils.data.Dataset):
         x, edge_index, edge_attr = arch_to_graph(arch)
         g_data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
 
-        couples = f.split('_')[2]
-        couples = couples[1:-1] # remove from text "[", "]"
-        couples = couples.replace(",", " ") # substitute "," with " "
         if cfg.MODEL.DIFFUSION_PER_LAYER:
             num_layers = int(f[3])+1
             sampled_layer = random.randint(1, num_layers)
             text = f"{sampled_layer} {num_layers} " + couples
         else:
-            text = f.split('_')[0][-1] + ' ' + couples
+            text = self.text_dict[f.split(".")[0][:-2]]
 
         return g_data, text, f, data
 
@@ -96,7 +94,7 @@ def custom_collate_fn(batch):
     # personal note: remember that the shuffling is applied before data is passed to the collate_fn
     data_list = [d[0] for d in batch]
     graphs_batch = Batch.from_data_list(data_list)
-    text_list = [d[1] for d in batch]
+    text_list = torch.tensor([d[1] for d in batch])
     f_list = [d[2] for d in batch]
     sequential_list = [d[3] for d in batch]
     layers_mask = None

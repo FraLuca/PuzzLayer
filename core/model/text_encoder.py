@@ -6,7 +6,7 @@ class TextEncoder(torch.nn.Module):
         super(TextEncoder, self).__init__()
         self.embed_scale = input_dim ** 0.5
         self.embed_tokens = torch.nn.Embedding(vocab_size, input_dim)
-        self.pos_embed = torch.nn.Parameter(torch.randn((1, 6 if cfg.MODEL.DIFFUSION_PER_LAYER else 5, input_dim))) # second dimension is the number of max tokens
+        # self.pos_embed = torch.nn.Parameter(torch.randn((1, 6 if cfg.MODEL.DIFFUSION_PER_LAYER else 19, input_dim))) # second dimension is the number of max tokens
         # self.seg_embed = torch.nn.Parameter(torch.randn((2, input_dim)))
         self.dropout = torch.nn.Dropout(dropout)
 
@@ -22,7 +22,7 @@ class TextEncoder(torch.nn.Module):
 
     def forward(self, x):
         x = self.embed_tokens(x) * self.embed_scale
-        x = x + self.pos_embed
+        # x = x + self.pos_embed
         # x[:, :1] = x[:, :1] + self.seg_embed[0][None, None, :]
         # x[:, 1:] = x[:, 1:] + self.seg_embed[1][None, None, :]
         x = self.dropout(x)
