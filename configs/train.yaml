@@ -7,18 +7,18 @@ MODEL:
   DIFFUSION_PER_LAYER: True
 
 WANDB:
-  ENABLE: True
+  ENABLE: False
   GROUP: "diffusion"
   PROJECT: "PuzzLayer"
   ENTITY: "pinlab-sapienza"
-  OFFLINE: True
+  OFFLINE: False
 
 DATASETS:
   TRAIN: "datasets/trainCNN/"   # mnist, cifar10, cifar100, imagenette, imagenet
   TEST: "datasets/validCNN/"
 
 SOLVER:
- GPUS: [0,1,2,3,4,7]
+ GPUS: [7]
  NUM_WORKERS: 4
  MODEL_ENCODER_LR: 0.0005
  TEXT_ENCODER_LR: 0.0005
@@ -33,7 +33,7 @@ NAME: "layerdiffusion_prova"
 OUTPUT_DIR: "results/debug"
 PRETRAINED_MODEL_ENCODER: None #"results/debug/dgx lr 5e-4 no wd/_val_acc=0.830.ckpt"
 SAVE_CHECK_EVERY: 500
-SAVE_LAST_CKPT: True
+SAVE_LAST_CKPT: False
 resume: ""
 SEED: -1
 DEBUG: 0

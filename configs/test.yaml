@@ -4,6 +4,7 @@ MODEL:
   MODEL_OUTPUT_DIM: 64
   PROJ_OUTPUT_DIM: 64
   DROPOUT: 0.1
+  DIFFUSION_PER_LAYER: True
 
 WANDB:
   ENABLE: False
@@ -27,10 +28,10 @@ SOLVER:
  BATCH_SIZE_VAL: 30
  
 
-NAME: "diffusion_fullcnn" # "dgx_pretrained_moretext_lr5e-4_nowd_64batch_1gpu"
+NAME: "layerdiffusion_test" # "dgx_pretrained_moretext_lr5e-4_nowd_64batch_1gpu"
 OUTPUT_DIR: "results/debug"
 PRETRAINED_MODEL_ENCODER: None #"results/debug/text_lr5e-4_nowd/_val_acc=1.000.ckpt"
-MODEL_TO_TEST: "results/debug/diffusion_fullcnn/model_4999.ckpt"
+MODEL_TO_TEST: "results/debug/layerdiffusion_faster/_val_loss=0.008.ckpt"
 SAVE_CHECK_EVERY: 200
 resume: ""
 SEED: -1
