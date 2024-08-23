@@ -195,3 +195,5 @@ diffusers/
 *.out
 *.sh
 cineca_logs/
+*.pt
+text_embedding.py
