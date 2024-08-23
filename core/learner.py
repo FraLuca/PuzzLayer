@@ -57,11 +57,17 @@ class Learner(pl.LightningModule):
 
         self.text_projection = nn.Sequential(nn.Linear(1536, cfg.MODEL.PROJ_OUTPUT_DIM),
                                             nn.ReLU(),
-                                            nn.Linear(cfg.MODEL.PROJ_OUTPUT_DIM, cfg.MODEL.PROJ_OUTPUT_DIM))
+                                            nn.Linear(cfg.MODEL.PROJ_OUTPUT_DIM, cfg.MODEL.PROJ_OUTPUT_DIM),
+                                            nn.BatchNorm1d(cfg.MODEL.PROJ_OUTPUT_DIM))
         
-        self.model_projection = ProjectionHead(embedding_dim=cfg.MODEL.MODEL_OUTPUT_DIM,
-                                                projection_dim=cfg.MODEL.PROJ_OUTPUT_DIM,
-                                                dropout=cfg.MODEL.DROPOUT)
+        #self.model_projection = nn.Sequential(nn.Linear(cfg.MODEL.MODEL_INPUT_DIM, cfg.MODEL.PROJ_OUTPUT_DIM),
+        #                                    nn.ReLU(),
+        #                                    nn.Linear(cfg.MODEL.PROJ_OUTPUT_DIM, cfg.MODEL.PROJ_OUTPUT_DIM),
+        #                                    nn.LayerNorm(cfg.MODEL.PROJ_OUTPUT_DIM))
+        
+        #self.model_projection = ProjectionHead(embedding_dim=cfg.MODEL.MODEL_OUTPUT_DIM,
+        #                                        projection_dim=cfg.MODEL.PROJ_OUTPUT_DIM,
+        #                                        dropout=cfg.MODEL.DROPOUT)
 
         self.criterion = nn.MSELoss()
 
@@ -220,7 +226,8 @@ class Learner(pl.LightningModule):
         parameters = [
             {"params": self.model_denoiser.parameters(), "lr": self.cfg.SOLVER.MODEL_ENCODER_LR},
             {
-                "params": list(self.model_projection.parameters()) + list(self.text_projection.parameters()),
+                #"params": list(self.model_projection.parameters()) + list(self.text_projection.parameters()),
+                "params": list(self.text_projection.parameters()),
                 "lr": self.cfg.SOLVER.PROJ_LR,
                 "weight_decay": self.cfg.SOLVER.WEIGHT_DECAY,
             },
@@ -328,7 +335,7 @@ class Learner(pl.LightningModule):
         model_batch, text_batch, f, sequential, layers_mask = batch
 
         edge_batch = model_batch.batch[model_batch.edge_index[0]] # edge_batch will contain the graph index for each edge
-
+        # print sstatistics of the text embeddings
         text_batch_embedded = self.text_projection(text_batch)
         # now repeat same text_emb for all edges in the same graph
         text_batch_embedded = text_batch_embedded[edge_batch]
@@ -369,7 +376,7 @@ class Learner(pl.LightningModule):
         noised_weights = noised_weights * self.ddim_scheduler.init_noise_sigma
 
         # set timesteps
-        # self.ddim_scheduler.set_timesteps(50)
+        #self.ddim_scheduler.set_timesteps(50)
         timesteps = self.ddim_scheduler.timesteps.to(model_batch.edge_attr.device)
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         # eta (η) is only used with the DDIMScheduler, and between [0, 1]

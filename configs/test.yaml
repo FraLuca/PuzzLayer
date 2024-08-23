@@ -4,7 +4,7 @@ MODEL:
   MODEL_OUTPUT_DIM: 64
   PROJ_OUTPUT_DIM: 64
   DROPOUT: 0.1
-  DIFFUSION_PER_LAYER: True
+  DIFFUSION_PER_LAYER: False
 
 WANDB:
   ENABLE: False
@@ -13,12 +13,12 @@ WANDB:
   ENTITY: "pinlab-sapienza"
 
 DATASETS:
-  TRAIN: "datasets/trainCNN/"   # mnist, cifar10, cifar100, imagenette, imagenet
-  TEST: "datasets/validCNN/"
+  TRAIN: "datasets/trainVAR/"   # mnist, cifar10, cifar100, imagenette, imagenet
+  TEST: "datasets/validVARfromTRAIN/"
 
 SOLVER:
 #  GPUS: [2,3]
- GPU_TEST: [5]
+ GPU_TEST: [2]
  NUM_WORKERS: 4
 #  BASE_LR1: 0.0001
 #  BASE_LR2: 0. #0.0001
@@ -31,7 +31,7 @@ SOLVER:
 NAME: "layerdiffusion_test" # "dgx_pretrained_moretext_lr5e-4_nowd_64batch_1gpu"
 OUTPUT_DIR: "results/debug"
 PRETRAINED_MODEL_ENCODER: None #"results/debug/text_lr5e-4_nowd/_val_acc=1.000.ckpt"
-MODEL_TO_TEST: "results/debug/layerdiffusion_faster/_val_loss=0.008.ckpt"
+MODEL_TO_TEST: "results/debug/diffusion_vardata_batchnorm/_val_loss=0.014.ckpt"
 SAVE_CHECK_EVERY: 200
 resume: ""
 SEED: -1
