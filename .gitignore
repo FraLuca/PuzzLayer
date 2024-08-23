@@ -190,3 +190,5 @@ Dockerfile
 *.ckpt
 data/MNIST/
 generate_nets/
+*.pt
+text_embedding.py
