@@ -192,3 +192,5 @@ data/MNIST/
 generate_nets/
 *.pt
 text_embedding.py
+*.sh
+cineca_logs/

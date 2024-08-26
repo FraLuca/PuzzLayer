@@ -67,7 +67,7 @@ def test_on_mnist(reco_model, orig_model, filenames, limit_to_first=0, print_eac
         orig_accuracies_sum += orig_correct/len(mnist_test)
         reco_accuracies_sum += reco_correct/len(mnist_test)
         if print_each_acc:
-            print(f"  model: {filenames[i]}, orig_acc: {round(orig_correct/len(mnist_test), 3)}, reco_acc: {round(reco_correct/len(mnist_subset), 3)}, dict: {dictionary}")
+            print(f"  model: {filenames[i]}, orig_acc: {round(orig_correct/len(mnist_test), 3)}, reco_acc: {round(reco_correct/len(mnist_test), 3)}, dict: {dictionary}")
 
     avg_orig_accuracy = orig_accuracies_sum / limit_to_first
     avg_reco_accuracy = reco_accuracies_sum / limit_to_first
