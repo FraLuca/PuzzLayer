@@ -150,7 +150,10 @@ class Learner(pl.LightningModule):
 
         # evaluate generated models on MNIST
         new_sequential = create_sequentials_from_graphs(generated, sequential)
-        avg_reco_acc, avg_orig_acc = test_on_mnist(new_sequential, sequential, f)
+        if cfg.MODEL.TEST_ON_COUPLES:
+            avg_reco_acc, avg_orig_acc = test_on_mnist_couples(new_sequential, sequential, f)
+        else:
+            avg_reco_acc, avg_orig_acc = test_on_mnist(new_sequential, sequential, f)
 
         self.log('test_reco_acc', avg_reco_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('test_orig_acc', avg_orig_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)

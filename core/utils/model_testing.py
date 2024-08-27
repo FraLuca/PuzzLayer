@@ -75,6 +75,68 @@ def test_on_mnist(reco_model, orig_model, filenames, limit_to_first=0, print_eac
     return avg_reco_accuracy, avg_orig_accuracy
 
 
+def test_on_mnist_couples(reco_model, orig_model, filenames, limit_to_first=0, print_each_acc=False):
+
+    # load MNIST dataset
+    mnist_test = datasets.MNIST('data',
+                                train=False,
+                                download=True,
+                                transform=transforms.Compose([
+                                        transforms.Resize((28, 28)),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize((0.1307,), (0.3081,))
+                                    ])
+                                )
+    
+    if limit_to_first == 0:
+        limit_to_first = len(reco_model)
+
+    orig_accuracies_sum = 0
+    reco_accuracies_sum = 0
+
+    for i in tqdm(range(limit_to_first)):
+        orig_model[i].eval()
+        reco_model[i].eval()
+
+        classes = filenames[i].split('_')[2]
+        device = next(orig_model[i].parameters()).device
+
+        indices = [i for i, (_, label) in enumerate(mnist_test) if str(label) in classes]
+        mnist_subset = Subset(mnist_test, indices)
+        test_loader = DataLoader(mnist_subset, batch_size=64, shuffle=False)
+
+        orig_correct = 0
+        reco_correct = 0
+        dictionary = {}
+
+        for data, target in test_loader:
+            data, target = data.to(device), target.to(device) # data.half().to(device), target.to(device)
+            output = orig_model[i](data)
+            orig_correct += output.argmax(dim=1).eq(target).sum().item()
+            output = reco_model[i](data)
+            if print_each_acc:
+                # count how many times each value in output.argmax(dim=1) appears
+                for val in output.argmax(dim=1).tolist():
+                    if val in dictionary:
+                        dictionary[val] += 1
+                    else:
+                        dictionary[val] = 1
+
+            reco_correct += output.argmax(dim=1).eq(target).sum().item()
+        
+        orig_accuracies_sum += orig_correct/len(mnist_subset)
+        reco_accuracies_sum += reco_correct/len(mnist_subset)
+        if print_each_acc:
+            print(f"  model: {filenames[i]}, orig_acc: {round(orig_correct/len(mnist_subset), 3)}, reco_acc: {round(reco_correct/len(mnist_subset), 3)}, dict: {dictionary}")
+
+    avg_orig_accuracy = orig_accuracies_sum / limit_to_first
+    avg_reco_accuracy = reco_accuracies_sum / limit_to_first
+
+    return avg_reco_accuracy, avg_orig_accuracy
+
+
+########## ignore below, just used for some fast testing
+
 def test_adding_noise(orig_model, filenames):
     print("TESTING ADDING NOISE TO THE WEIGHTS")
 

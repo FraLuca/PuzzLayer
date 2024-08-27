@@ -30,7 +30,7 @@ class ModelDataset(torch.utils.data.Dataset):
         self.file_list = os.listdir(self.path)
         # self.max_num_ckpt = torch.load(self.path + self.file_list[0])['pdata'].shape[0]
         self.max_num_ckpt = 1
-        self.text_dict = torch.load("datasets/texts/var_text_embeddings.pt")
+        self.text_dict = torch.load(cfg.DATASETS.TEXT)
 
         # model = torch.load("mnist/NND_mnist_run1.pt", map_location='cpu')['model'].module
         self.model = {
